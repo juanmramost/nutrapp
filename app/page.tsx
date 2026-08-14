@@ -8,6 +8,7 @@ import { DashboardView } from "@/components/views/dashboard-view"
 import { ScanFoodView } from "@/components/views/scan-food-view"
 import { WorkoutView } from "@/components/views/workout-view"
 import { ProfileView } from "@/components/views/profile-view"
+import { ProgresoView } from "@/components/views/progreso-view"
 
 function AppShell() {
   const { ready } = useTracker()
@@ -35,6 +36,7 @@ function AppShell() {
           {tab === "scan" && <ScanFoodView onSaved={() => setTab("dashboard")} />}
           {tab === "workout" && <WorkoutView onSaved={() => setTab("dashboard")} />}
           {tab === "profile" && <ProfileView />}
+          {tab === "progreso" && <ProgresoView />}
         </motion.div>
       </AnimatePresence>
 
