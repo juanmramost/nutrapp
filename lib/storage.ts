@@ -83,6 +83,37 @@ export function saveApiKey(key: string) {
   localStorage.setItem(API_KEY_KEY, key.trim())
 }
 
+const DEFICITS_KEY = "daily_deficits"
+
+export function loadDeficits(): Record<string, number> {
+  if (!isBrowser()) return {}
+  try {
+    const raw = localStorage.getItem(DEFICITS_KEY)
+    if (!raw) return {}
+    return JSON.parse(raw) as Record<string, number>
+  } catch {
+    return {}
+  }
+}
+
+export function saveDeficits(deficits: Record<string, number>) {
+  if (!isBrowser()) return
+  localStorage.setItem(DEFICITS_KEY, JSON.stringify(deficits))
+}
+
+export function setDeficit(dateKey: string, kcal: number) {
+  if (!isBrowser()) return
+  const next = { ...loadDeficits(), [dateKey]: Math.round(kcal) }
+  saveDeficits(next)
+}
+
+export function removeDeficit(dateKey: string) {
+  if (!isBrowser()) return
+  const d = loadDeficits()
+  delete d[dateKey]
+  saveDeficits(d)
+}
+
 export function newId(): string {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
 }
