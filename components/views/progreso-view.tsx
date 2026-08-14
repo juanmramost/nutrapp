@@ -54,31 +54,11 @@ export function ProgresoView() {
       </header>
 
       <Card className="gap-4 px-4">
-        <h2 className="text-sm font-semibold">Registrar déficit diario</h2>
-        <div className="grid grid-cols-2 gap-3">
-          <div>
-            <Label className="text-xs text-muted-foreground">Fecha</Label>
-            <Input
-              type="date"
-              value={selectedDate}
-              onChange={(e) => setSelectedDate(e.target.value)}
-              className="h-12"
-            />
-          </div>
-          <div>
-            <Label className="text-xs text-muted-foreground">Déficit (kcal)</Label>
-            <Input
-              type="number"
-              inputMode="numeric"
-              value={kcal === "" ? "" : String(kcal)}
-              onChange={(e) => setKcal(e.target.value === "" ? "" : Number(e.target.value))}
-              className="h-12"
-            />
-          </div>
-        </div>
-        <Button className="h-12 w-full mt-2" onClick={handleSave}>
-          Guardar déficit
-        </Button>
+        <h2 className="text-sm font-semibold">Déficit diario (automático)</h2>
+        <p className="text-xs text-muted-foreground">
+          Los déficits se registran automáticamente al guardar comidas o entrenos. Aquí puedes revisar y
+          eliminar registros si es necesario.
+        </p>
       </Card>
 
       <Card className="gap-4 px-4">
