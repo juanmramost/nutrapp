@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { Check, Eye, EyeOff, KeyRound } from "lucide-react"
+import { Check } from "lucide-react"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -41,12 +41,9 @@ function Field({
 }
 
 export function ProfileView() {
-  const { profile, setProfile, apiKey, setApiKey } = useTracker()
+  const { profile, setProfile } = useTracker()
   const [draft, setDraft] = useState<UserProfile>(profile)
-  const [keyDraft, setKeyDraft] = useState(apiKey)
-  const [showKey, setShowKey] = useState(false)
   const [savedProfile, setSavedProfile] = useState(false)
-  const [savedKey, setSavedKey] = useState(false)
 
   const basalCalculado = calcBasal(draft)
 
@@ -65,11 +62,7 @@ export function ProfileView() {
     setSavedProfile(true)
   }
 
-  function handleSaveKey() {
-    setApiKey(keyDraft)
-    setSavedKey(true)
-    setTimeout(() => setSavedKey(false), 2000)
-  }
+
 
   return (
     <div className="flex flex-col gap-5 px-4 pb-4 pt-6">
@@ -153,45 +146,7 @@ export function ProfileView() {
         {savedProfile ? "Perfil guardado" : "Guardar perfil"}
       </Button>
 
-      <Card className="gap-4 px-4">
-        <div className="flex items-center gap-2">
-          <KeyRound className="size-4 text-food" />
-          <h2 className="text-sm font-semibold">Gemini API Key</h2>
-        </div>
-        <p className="text-xs text-muted-foreground">
-          Se guarda en tu dispositivo (localStorage) y se usa para analizar tus fotos con la IA.
-        </p>
-        <div className="relative">
-          <Input
-            type={showKey ? "text" : "password"}
-            value={keyDraft}
-            onChange={(e) => {
-              setKeyDraft(e.target.value)
-              setSavedKey(false)
-            }}
-            placeholder="AIza..."
-            className="h-12 pr-12 font-mono"
-            autoComplete="off"
-          />
-          <button
-            type="button"
-            onClick={() => setShowKey((s) => !s)}
-            aria-label={showKey ? "Ocultar clave" : "Mostrar clave"}
-            className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground"
-          >
-            {showKey ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
-          </button>
-        </div>
-        <Button
-          variant="secondary"
-          className="h-12 w-full gap-2"
-          onClick={handleSaveKey}
-          disabled={keyDraft.trim() === apiKey.trim()}
-        >
-          {savedKey ? <Check className="size-4" /> : null}
-          {savedKey ? "Clave guardada" : "Guardar clave"}
-        </Button>
-      </Card>
+      
 
       <p className="pb-2 text-center text-xs text-muted-foreground">
         Déficit · Tracker con IA de Gemini
