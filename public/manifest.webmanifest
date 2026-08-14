@@ -1,0 +1,18 @@
+{
+  "name": "Déficit — Tracker de Nutrición y Ejercicio",
+  "short_name": "Déficit",
+  "description": "Registra comida y entrenamientos con IA y controla tu déficit calórico diario.",
+  "start_url": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#09090b",
+  "theme_color": "#09090b",
+  "icons": [
+    {
+      "src": "/app-icon.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
