@@ -48,7 +48,7 @@ function NumberField({
 }
 
 export function ScanFoodView({ onSaved }: Props) {
-  const { addToday } = useTracker()
+  const { apiKey, addToday } = useTracker()
   const [file, setFile] = useState<File | null>(null)
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
@@ -76,7 +76,7 @@ export function ScanFoodView({ onSaved }: Props) {
     setError(null)
     try {
       const part = await fileToImagePart(file)
-      const analysis = await analyzeFood(part)
+      const analysis = await analyzeFood(part, apiKey)
       setResult(analysis)
     } catch (e) {
       setError(e instanceof Error ? e.message : "Error al analizar la foto")
