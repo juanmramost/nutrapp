@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { ImagePicker } from "@/components/image-picker"
 import { useTracker } from "@/hooks/use-tracker"
-import { analyzeWorkout, fileToImagePart } from "@/lib/gemini"
+import { fileToImagePart } from "@/lib/gemini"
 import { newId } from "@/lib/storage"
 import type { WorkoutAnalysis } from "@/lib/types"
 
@@ -19,7 +19,7 @@ interface Props {
 }
 
 export function WorkoutView({ onSaved }: Props) {
-  const { apiKey, addToday } = useTracker()
+  const { addToday } = useTracker()
 
   // Captura (IA)
   const [file, setFile] = useState<File | null>(null)
@@ -53,7 +53,14 @@ export function WorkoutView({ onSaved }: Props) {
     setError(null)
     try {
       const part = await fileToImagePart(file)
-      setResult(await analyzeWorkout(part, apiKey))
+      const res = await fetch("/api/analyze", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ mode: "workout", image: part }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data?.error || "Error al analizar la captura")
+      setResult(data as WorkoutAnalysis)
     } catch (e) {
       setError(e instanceof Error ? e.message : "Error al analizar la captura")
     } finally {

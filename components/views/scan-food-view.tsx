@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { ImagePicker } from "@/components/image-picker"
 import { useTracker } from "@/hooks/use-tracker"
-import { analyzeFood, fileToImagePart } from "@/lib/gemini"
+import { fileToImagePart } from "@/lib/gemini"
 import { newId } from "@/lib/storage"
 import type { FoodAnalysis } from "@/lib/types"
 
@@ -48,7 +48,7 @@ function NumberField({
 }
 
 export function ScanFoodView({ onSaved }: Props) {
-  const { apiKey, addToday } = useTracker()
+  const { addToday } = useTracker()
   const [file, setFile] = useState<File | null>(null)
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
@@ -76,8 +76,14 @@ export function ScanFoodView({ onSaved }: Props) {
     setError(null)
     try {
       const part = await fileToImagePart(file)
-      const analysis = await analyzeFood(part, apiKey)
-      setResult(analysis)
+      const res = await fetch("/api/analyze", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ mode: "food", image: part }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data?.error || "Error al analizar la foto")
+      setResult(data as FoodAnalysis)
     } catch (e) {
       setError(e instanceof Error ? e.message : "Error al analizar la foto")
     } finally {
