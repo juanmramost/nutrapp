@@ -68,6 +68,15 @@ export function TrackerProvider({ children }: { children: React.ReactNode }) {
     saveApiKey(k)
   }, [])
 
+  const todayEntries = useMemo(() => logs[todayKey] ?? [], [logs, todayKey])
+
+  const basal = useMemo(
+    () => (profile.auto_basal ? calcBasal(profile) : profile.tdee_basal),
+    [profile],
+  )
+
+  const totals = useMemo(() => computeTotals(todayEntries, basal), [todayEntries, basal])
+
   const addToday = useCallback(
     (entry: LogEntry) => {
       setLogs((prev) => {
