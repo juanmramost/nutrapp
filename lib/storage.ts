@@ -103,7 +103,15 @@ export function saveDeficits(deficits: Record<string, number>) {
 
 export function setDeficit(dateKey: string, kcal: number) {
   if (!isBrowser()) return
-  const next = { ...loadDeficits(), [dateKey]: Math.round(kcal) }
+  const rounded = Math.round(kcal)
+  if (rounded === 0) {
+    // treat zero as no record
+    const d = loadDeficits()
+    delete d[dateKey]
+    saveDeficits(d)
+    return
+  }
+  const next = { ...loadDeficits(), [dateKey]: rounded }
   saveDeficits(next)
 }
 
