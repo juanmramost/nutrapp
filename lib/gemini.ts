@@ -139,13 +139,13 @@ Reglas estrictas:
 - Devuelve ÚNICAMENTE un objeto JSON válido y nada más (sin texto explicativo, sin comentarios).
 
 Formato requerido (campos exactos):
-- `plato`: string (nombre del plato)
-- `calorias_totales`: number (kcal, entero redondeado)
-- `proteinas_g`: number (gramos, entero redondeado)
-- `carbohidratos_g`: number (gramos, entero redondeado)
-- `grasas_g`: number (gramos, entero redondeado)
-- `ingredientes`: array de strings (ingredientes principales; solo visibles o mencionados)
-- `confianza_estimacion`: string (una de "alta" | "media" | "baja")
+- 'plato': string (nombre del plato)
+- 'calorias_totales': number (kcal, entero redondeado)
+- 'proteinas_g': number (gramos, entero redondeado)
+- 'carbohidratos_g': number (gramos, entero redondeado)
+- 'grasas_g': number (gramos, entero redondeado)
+- 'ingredientes': array de strings (ingredientes principales; solo visibles o mencionados)
+- 'confianza_estimacion': string (una de "alta" | "media" | "baja")
 
 Reglas numéricas y de redondeo:
 - Redondea todos los números a enteros.
