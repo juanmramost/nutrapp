@@ -86,6 +86,9 @@ export function TrackerProvider({ children }: { children: React.ReactNode }) {
           const dayEntries = next[todayKey] ?? []
           const totals = computeTotals(dayEntries, basal)
           setDeficit(todayKey, totals.deficitNeto)
+          if (typeof window !== "undefined") {
+            window.dispatchEvent(new CustomEvent("deficits:changed", { detail: { key: todayKey } }))
+          }
         } catch {
           /* ignore */
         }
@@ -104,6 +107,9 @@ export function TrackerProvider({ children }: { children: React.ReactNode }) {
           const dayEntries = next[todayKey] ?? []
           const totals = computeTotals(dayEntries, basal)
           setDeficit(todayKey, totals.deficitNeto)
+          if (typeof window !== "undefined") {
+            window.dispatchEvent(new CustomEvent("deficits:changed", { detail: { key: todayKey } }))
+          }
         } catch {
           /* ignore */
         }
@@ -122,6 +128,9 @@ export function TrackerProvider({ children }: { children: React.ReactNode }) {
           const dayEntries = next[todayKey] ?? []
           const totals = computeTotals(dayEntries, basal)
           setDeficit(todayKey, totals.deficitNeto)
+          if (typeof window !== "undefined") {
+            window.dispatchEvent(new CustomEvent("deficits:changed", { detail: { key: todayKey } }))
+          }
         } catch {
           /* ignore */
         }

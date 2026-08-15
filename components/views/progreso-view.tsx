@@ -29,6 +29,20 @@ export function ProgresoView() {
     setDeficits(loadDeficits())
   }, [])
 
+  useEffect(() => {
+    function handler() {
+      setDeficits(loadDeficits())
+    }
+    if (typeof window !== "undefined") {
+      window.addEventListener("deficits:changed", handler)
+    }
+    return () => {
+      if (typeof window !== "undefined") {
+        window.removeEventListener("deficits:changed", handler)
+      }
+    }
+  }, [])
+
   function handleDelete(dk: string) {
     const ok = window.confirm(`Eliminar registro para la fecha ${dk}?`)
     if (!ok) return
