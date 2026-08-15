@@ -3,6 +3,8 @@
 import { useState } from "react"
 import { AnimatePresence, motion } from "motion/react"
 import { TrackerProvider, useTracker } from "@/hooks/use-tracker"
+import { AuthProvider } from "@/hooks/use-auth"
+import AuthGate from "@/components/auth/auth-gate"
 import { BottomNav, type TabId } from "@/components/bottom-nav"
 import { DashboardView } from "@/components/views/dashboard-view"
 import { ScanFoodView } from "@/components/views/scan-food-view"
