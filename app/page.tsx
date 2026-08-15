@@ -47,8 +47,11 @@ function AppShell() {
 
 export default function Page() {
   return (
-    <TrackerProvider>
-      <AppShell />
-    </TrackerProvider>
+    <AuthProvider>
+      <TrackerProvider>
+        <AppShell />
+        <AuthGate />
+      </TrackerProvider>
+    </AuthProvider>
   )
 }

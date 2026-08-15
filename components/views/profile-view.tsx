@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { useTracker } from "@/hooks/use-tracker"
+import { useAuth } from "@/hooks/use-auth"
 import { calcBasal } from "@/lib/nutrition"
 import type { Genero, UserProfile } from "@/lib/types"
 
@@ -42,6 +43,7 @@ function Field({
 
 export function ProfileView() {
   const { profile, setProfile } = useTracker()
+  const { user, isGuest, signOut, clearGuest } = useAuth()
   const [draft, setDraft] = useState<UserProfile>(profile)
   const [savedProfile, setSavedProfile] = useState(false)
 
@@ -145,6 +147,22 @@ export function ProfileView() {
         {savedProfile ? <Check className="size-4" /> : null}
         {savedProfile ? "Perfil guardado" : "Guardar perfil"}
       </Button>
+
+      <div className="mt-4">
+        {user ? (
+          <Button variant="outline" className="w-full" onClick={() => signOut()}>
+            Cerrar sesión
+          </Button>
+        ) : isGuest ? (
+          <Button variant="outline" className="w-full" onClick={() => { clearGuest(); window.location.reload() }}>
+            Salir de invitado
+          </Button>
+        ) : (
+          <a href="/login">
+            <Button variant="outline" className="w-full">Iniciar sesión</Button>
+          </a>
+        )}
+      </div>
 
       
 
