@@ -17,7 +17,9 @@ import {
   setDeficit,
   removeDeficit,
 } from "@/lib/storage"
-import { getProfile, getLogs, getDeficits } from "@/lib/supabaseSync"
+import { getProfile, getLogs, getDeficits, upsertProfile, upsertLogs, upsertDeficits } from "@/lib/supabaseSync"
+import supabase from "@/lib/supabaseClient"
+import { loadDeficits, saveDeficits } from "@/lib/storage"
 import { useAuth } from "@/hooks/use-auth"
 import { calcBasal, computeTotals, type DayTotals } from "@/lib/nutrition"
 
@@ -62,6 +64,7 @@ export function TrackerProvider({ children }: { children: React.ReactNode }) {
 
   // When a user logs in, try to load remote data and apply locally
   const { user } = useAuth()
+  const isApplyingRemoteRef = useRef(false)
 
   useEffect(() => {
     async function loadRemote() {
@@ -72,6 +75,8 @@ export function TrackerProvider({ children }: { children: React.ReactNode }) {
           getLogs(user.id),
           getDeficits(user.id),
         ])
+        // apply remote data but avoid echoing back to remote while applying
+        isApplyingRemoteRef.current = true
         if (remoteProfile) {
           setProfileState(remoteProfile)
           try { saveProfile(remoteProfile) } catch {}
@@ -83,11 +88,72 @@ export function TrackerProvider({ children }: { children: React.ReactNode }) {
         if (remoteDeficits) {
           try { saveDeficits(remoteDeficits) } catch {}
         }
+        isApplyingRemoteRef.current = false
       } catch {
         /* ignore remote load errors */
       }
     }
     loadRemote()
+  }, [user])
+
+  // Subscribe to remote changes for real-time sync
+  useEffect(() => {
+    if (!user) return
+    const profileSub = supabase
+      .from(`profiles:user_id=eq.${user.id}`)
+      .on("INSERT", () => {})
+      .on("UPDATE", async () => {
+        try {
+          isApplyingRemoteRef.current = true
+          const remote = await getProfile(user.id)
+          if (remote) {
+            setProfileState(remote)
+            try { saveProfile(remote) } catch {}
+          }
+        } finally {
+          isApplyingRemoteRef.current = false
+        }
+      })
+      .subscribe()
+
+    const logsSub = supabase
+      .from(`logs:user_id=eq.${user.id}`)
+      .on("INSERT", () => {})
+      .on("UPDATE", async () => {
+        try {
+          isApplyingRemoteRef.current = true
+          const remote = await getLogs(user.id)
+          if (remote) {
+            setLogs(remote)
+            try { saveLogs(remote) } catch {}
+          }
+        } finally {
+          isApplyingRemoteRef.current = false
+        }
+      })
+      .subscribe()
+
+    const deficitsSub = supabase
+      .from(`deficits:user_id=eq.${user.id}`)
+      .on("INSERT", () => {})
+      .on("UPDATE", async () => {
+        try {
+          isApplyingRemoteRef.current = true
+          const remote = await getDeficits(user.id)
+          if (remote) {
+            try { saveDeficits(remote) } catch {}
+          }
+        } finally {
+          isApplyingRemoteRef.current = false
+        }
+      })
+      .subscribe()
+
+    return () => {
+      try { supabase.removeSubscription(profileSub) } catch {}
+      try { supabase.removeSubscription(logsSub) } catch {}
+      try { supabase.removeSubscription(deficitsSub) } catch {}
+    }
   }, [user])
 
   const setProfile = useCallback((p: UserProfile) => {
@@ -103,6 +169,12 @@ export function TrackerProvider({ children }: { children: React.ReactNode }) {
     } catch {
       /* ignore errors */
     }
+    // push to remote if logged in and not applying remote changes
+    try {
+      if (user && !isApplyingRemoteRef.current) {
+        void upsertProfile(user.id, p)
+      }
+    } catch {}
   }, [todayKey])
 
   const setApiKey = useCallback((k: string) => {
@@ -176,6 +248,13 @@ export function TrackerProvider({ children }: { children: React.ReactNode }) {
         } catch {
           /* ignore */
         }
+        // push logs & deficits to remote
+        try {
+          if (user && !isApplyingRemoteRef.current) {
+            void upsertLogs(user.id, next)
+            void upsertDeficits(user.id, loadDeficits())
+          }
+        } catch {}
         return next
       })
     },
@@ -203,6 +282,12 @@ export function TrackerProvider({ children }: { children: React.ReactNode }) {
         } catch {
           /* ignore */
         }
+        try {
+          if (user && !isApplyingRemoteRef.current) {
+            void upsertLogs(user.id, next)
+            void upsertDeficits(user.id, loadDeficits())
+          }
+        } catch {}
         return next
       })
     },
@@ -230,6 +315,12 @@ export function TrackerProvider({ children }: { children: React.ReactNode }) {
         } catch {
           /* ignore */
         }
+        try {
+          if (user && !isApplyingRemoteRef.current) {
+            void upsertLogs(user.id, next)
+            void upsertDeficits(user.id, loadDeficits())
+          }
+        } catch {}
         return next
       })
     },
