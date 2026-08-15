@@ -15,6 +15,7 @@ import {
   saveProfile,
   updateEntry,
   setDeficit,
+  removeDeficit,
 } from "@/lib/storage"
 import { calcBasal, computeTotals, type DayTotals } from "@/lib/nutrition"
 
@@ -29,6 +30,7 @@ interface TrackerContextValue {
   setApiKey: (k: string) => void
   addToday: (entry: LogEntry) => void
   removeToday: (id: string) => void
+  removeDay: (dateKey: string) => void
   updateToday: (entry: LogEntry) => void
 }
 
@@ -84,6 +86,31 @@ export function TrackerProvider({ children }: { children: React.ReactNode }) {
   )
 
   const totals = useMemo(() => computeTotals(todayEntries, basal), [todayEntries, basal])
+
+  const removeDay = useCallback(
+    (dk: string) => {
+      setLogs((prev) => {
+        const next = { ...prev }
+        if (next[dk]) delete next[dk]
+        saveLogs(next)
+        try {
+          removeDeficit(dk)
+        } catch {}
+        return next
+      })
+
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new CustomEvent("deficits:changed", { detail: { key: dk } }))
+        try {
+          bcRef.current?.postMessage({ type: "sync", key: dk })
+        } catch {}
+        try {
+          localStorage.setItem("nutrapp:sync", String(Date.now()))
+        } catch {}
+      }
+    },
+    [],
+  )
 
   const addToday = useCallback(
     (entry: LogEntry) => {
@@ -219,6 +246,7 @@ export function TrackerProvider({ children }: { children: React.ReactNode }) {
     setApiKey,
     addToday,
     removeToday,
+    removeDay,
     updateToday,
   }
 

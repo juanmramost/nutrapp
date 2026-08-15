@@ -1,10 +1,11 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
+import { useTracker } from "@/hooks/use-tracker"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogHeader, DialogFooter, DialogTitle, DialogDescription, DialogTrigger, DialogClose } from "@/components/ui/dialog"
-import { dateKey, loadDeficits, loadLogs, setDeficit, removeDeficit } from "@/lib/storage"
+import { dateKey, loadDeficits, loadLogs } from "@/lib/storage"
 
 function formatDate(k: string) {
   return k
@@ -65,11 +66,21 @@ export function ProgresoView() {
     }
   }, [])
 
+  const { removeDay } = useTracker()
+
   function handleDelete(dk: string) {
     const ok = window.confirm(`Eliminar registro para la fecha ${dk}?`)
     if (!ok) return
-    removeDeficit(dk)
-    setDeficits(loadDeficits())
+    removeDay(dk)
+    // reload visible deficits
+    const d = loadDeficits()
+    const logs = loadLogs()
+    const out: Record<string, number> = {}
+    for (const k of Object.keys(d)) {
+      const entries = logs[k] ?? []
+      if (entries.length > 0) out[k] = d[k]
+    }
+    setDeficits(out)
   }
 
   function handleBulkDelete() {
@@ -79,9 +90,17 @@ export function ProgresoView() {
   function confirmBulkDelete() {
     const keys = last7
     for (const k of keys) {
-      removeDeficit(k)
+      removeDay(k)
     }
-    setDeficits(loadDeficits())
+    // reload visible deficits
+    const d = loadDeficits()
+    const logs = loadLogs()
+    const out: Record<string, number> = {}
+    for (const k of Object.keys(d)) {
+      const entries = logs[k] ?? []
+      if (entries.length > 0) out[k] = d[k]
+    }
+    setDeficits(out)
     setConfirmBulkOpen(false)
   }
 
