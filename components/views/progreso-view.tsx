@@ -123,23 +123,7 @@ export function ProgresoView() {
         </div>
       </Card>
 
-      {/* Confirm delete single */}
-      <Dialog open={!!confirmKey} onOpenChange={(open) => !open && setConfirmKey(null)}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Confirmar eliminación</DialogTitle>
-            <DialogDescription>¿Eliminar el registro para la fecha {confirmKey}?</DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <DialogClose>
-              <Button variant="outline">Cancelar</Button>
-            </DialogClose>
-            <Button onClick={confirmDelete} className="bg-destructive text-destructive-foreground">
-              Eliminar
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      {/* single delete uses native confirm() via handleDelete */}
 
       {/* Confirm bulk delete */}
       <Dialog open={confirmBulkOpen} onOpenChange={setConfirmBulkOpen}>
