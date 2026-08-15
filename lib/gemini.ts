@@ -149,7 +149,7 @@ Formato requerido (campos exactos):
 
 Reglas numéricas y de redondeo:
 - Redondea todos los números a enteros.
-- `calorias_totales` en kcal; macros en gramos.
+- 'calorias_totales' en kcal; macros en gramos.
 - Si hay varios componentes, devuelve el total combinado.
 
 Ejemplo de salida JSON exacta (usa este esquema):
