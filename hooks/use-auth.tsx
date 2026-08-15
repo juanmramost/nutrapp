@@ -1,6 +1,7 @@
 "use client"
 
 import { createContext, useContext, useEffect, useState } from "react"
+import { useRouter } from "next/navigation"
 import supabase from "@/lib/supabaseClient"
 import { migrateLocalToRemote } from "@/lib/supabaseSync"
 import { loadProfile, loadLogs } from "@/lib/storage"
@@ -21,6 +22,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [isGuest, setIsGuest] = useState(false)
   const [ready, setReady] = useState(false)
+  const router = useRouter()
 
   useEffect(() => {
     // check guest flag
@@ -73,7 +75,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } finally {
       clearGuest()
       setUser(null)
-      if (typeof window !== "undefined") window.location.reload()
+      try {
+        router.push("/")
+      } catch {
+        if (typeof window !== "undefined") window.location.href = "/"
+      }
     }
   }
 
