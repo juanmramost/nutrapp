@@ -1,21 +1,27 @@
 import { NextResponse } from "next/server"
 import { analyzeFood, analyzeWorkout } from "@/lib/gemini"
+import { downloadFileAsBase64 } from "@/lib/supabaseAdmin"
 
 export async function POST(req: Request) {
   try {
     const body = await req.json()
-    const { mode, image, details } = body as { mode?: string; image?: any; details?: string }
+    const { mode, image, imagePath, details } = body as { mode?: string; image?: any; imagePath?: string; details?: string }
     const apiKey = process.env.GEMINI_API_KEY
     if (!apiKey) {
       return NextResponse.json({ error: "Server API key not configured" }, { status: 500 })
     }
 
-    if (!mode || !image) {
+    if (!mode || (!image && !imagePath)) {
       return NextResponse.json({ error: "Invalid request" }, { status: 400 })
     }
 
     if (mode === "food") {
-      const result = await analyzeFood(image, apiKey, details)
+      let imgPart = image
+      if (!imgPart && imagePath) {
+        // download from Supabase storage using admin key
+        imgPart = await downloadFileAsBase64(imagePath)
+      }
+      const result = await analyzeFood(imgPart, apiKey, details)
       return NextResponse.json(result)
     }
 

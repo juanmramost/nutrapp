@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label"
 import { ImagePicker } from "@/components/image-picker"
 import { useTracker } from "@/hooks/use-tracker"
 import { fileToImagePart, resizeImage } from "@/lib/gemini"
+import supabase from "@/lib/supabaseClient"
 import { newId } from "@/lib/storage"
 import type { FoodAnalysis } from "@/lib/types"
 
@@ -78,12 +79,37 @@ export function ScanFoodView({ onSaved }: Props) {
     setError(null)
     try {
       const resized = await resizeImage(file, 1024, 0.75)
-      const part = await fileToImagePart(resized)
-      const res = await fetch("/api/analyze", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ mode: "food", image: part, details: detalles }),
-      })
+      // If user is authenticated, upload to Supabase Storage and send imagePath to server
+      let res
+      try {
+        const userResp = await supabase.auth.getUser()
+        const user = userResp?.data?.user
+        if (user) {
+          const path = `uploads/${user.id}/${Date.now()}.jpg`
+          const { error: upErr } = await supabase.storage.from("uploads").upload(path, resized, { upsert: true })
+          if (upErr) throw upErr
+          res = await fetch("/api/analyze", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ mode: "food", imagePath: path, details: detalles }),
+          })
+        } else {
+          const part = await fileToImagePart(resized)
+          res = await fetch("/api/analyze", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ mode: "food", image: part, details: detalles }),
+          })
+        }
+      } catch (uploadErr) {
+        // fallback to sending base64
+        const part = await fileToImagePart(resized)
+        res = await fetch("/api/analyze", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ mode: "food", image: part, details: detalles }),
+        })
+      }
       const data = await res.json()
       if (!res.ok) throw new Error(data?.error || "Error al analizar la foto")
       setResult(data as FoodAnalysis)
