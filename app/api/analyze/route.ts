@@ -4,7 +4,7 @@ import { analyzeFood, analyzeWorkout } from "@/lib/gemini"
 export async function POST(req: Request) {
   try {
     const body = await req.json()
-    const { mode, image } = body as { mode?: string; image?: any }
+    const { mode, image, details } = body as { mode?: string; image?: any; details?: string }
     const apiKey = process.env.GEMINI_API_KEY
     if (!apiKey) {
       return NextResponse.json({ error: "Server API key not configured" }, { status: 500 })
@@ -15,7 +15,7 @@ export async function POST(req: Request) {
     }
 
     if (mode === "food") {
-      const result = await analyzeFood(image, apiKey)
+      const result = await analyzeFood(image, apiKey, details)
       return NextResponse.json(result)
     }
 

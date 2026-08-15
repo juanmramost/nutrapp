@@ -132,11 +132,14 @@ async function generateJson<T>(opts: GenerateOptions): Promise<T> {
 const FOOD_SYSTEM =
   "Eres un experto nutricionista. Analiza la foto de comida proporcionada y devuelve UNICAMENTE un objeto JSON con las calorías estimadas, macronutrientes e ingredientes principales. Sé conciso y riguroso."
  
-export function analyzeFood(image: ImagePart, apiKey: string): Promise<FoodAnalysis> {
+export function analyzeFood(image: ImagePart, apiKey: string, details?: string): Promise<FoodAnalysis> {
+  const promptBase = "Analiza este plato de comida."
+  const prompt = details && details.trim().length > 0 ? `${promptBase} Información adicional del usuario: ${details}. Usa esta información al estimar ingredientes y cantidades.` : promptBase
+
   return generateJson<FoodAnalysis>({
     apiKey,
     systemInstruction: FOOD_SYSTEM,
-    prompt: "Analiza este plato de comida.",
+    prompt,
     image,
     responseSchema: {
       type: "object",
