@@ -23,7 +23,6 @@ function lastNDates(n: number) {
 export function ProgresoView() {
   const today = dateKey()
   const [deficits, setDeficits] = useState<Record<string, number>>({})
-  const [confirmKey, setConfirmKey] = useState<string | null>(null)
   const [confirmBulkOpen, setConfirmBulkOpen] = useState(false)
 
   useEffect(() => {
@@ -31,15 +30,10 @@ export function ProgresoView() {
   }, [])
 
   function handleDelete(dk: string) {
-    // ask for confirmation first
-    setConfirmKey(dk)
-  }
-
-  function confirmDelete() {
-    if (!confirmKey) return
-    removeDeficit(confirmKey)
+    const ok = window.confirm(`Eliminar registro para la fecha ${dk}?`)
+    if (!ok) return
+    removeDeficit(dk)
     setDeficits(loadDeficits())
-    setConfirmKey(null)
   }
 
   function handleBulkDelete() {
