@@ -1,6 +1,6 @@
 "use client"
 
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react"
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react"
 import type { DailyLogs, LogEntry, UserProfile } from "@/lib/types"
 import {
   DEFAULT_PROFILE,
@@ -40,11 +40,19 @@ export function TrackerProvider({ children }: { children: React.ReactNode }) {
   const [logs, setLogs] = useState<DailyLogs>({})
   const [apiKey, setApiKeyState] = useState("")
   const todayKey = useMemo(() => dateKey(), [])
+  const bcRef = useRef<BroadcastChannel | null>(null)
 
   useEffect(() => {
     setProfileState(loadProfile())
     setLogs(loadLogs())
     setApiKeyState(loadApiKey())
+    if (typeof BroadcastChannel !== "undefined") {
+      try {
+        bcRef.current = new BroadcastChannel("nutrapp-sync")
+      } catch {
+        bcRef.current = null
+      }
+    }
     setReady(true)
   }, [])
 
@@ -88,6 +96,12 @@ export function TrackerProvider({ children }: { children: React.ReactNode }) {
           setDeficit(todayKey, totals.deficitNeto)
           if (typeof window !== "undefined") {
             window.dispatchEvent(new CustomEvent("deficits:changed", { detail: { key: todayKey } }))
+            try {
+              bcRef.current?.postMessage({ type: "sync", key: todayKey })
+            } catch {}
+            try {
+              localStorage.setItem("nutrapp:sync", String(Date.now()))
+            } catch {}
           }
         } catch {
           /* ignore */
@@ -109,6 +123,12 @@ export function TrackerProvider({ children }: { children: React.ReactNode }) {
           setDeficit(todayKey, totals.deficitNeto)
           if (typeof window !== "undefined") {
             window.dispatchEvent(new CustomEvent("deficits:changed", { detail: { key: todayKey } }))
+            try {
+              bcRef.current?.postMessage({ type: "sync", key: todayKey })
+            } catch {}
+            try {
+              localStorage.setItem("nutrapp:sync", String(Date.now()))
+            } catch {}
           }
         } catch {
           /* ignore */
@@ -130,6 +150,12 @@ export function TrackerProvider({ children }: { children: React.ReactNode }) {
           setDeficit(todayKey, totals.deficitNeto)
           if (typeof window !== "undefined") {
             window.dispatchEvent(new CustomEvent("deficits:changed", { detail: { key: todayKey } }))
+            try {
+              bcRef.current?.postMessage({ type: "sync", key: todayKey })
+            } catch {}
+            try {
+              localStorage.setItem("nutrapp:sync", String(Date.now()))
+            } catch {}
           }
         } catch {
           /* ignore */
@@ -139,6 +165,47 @@ export function TrackerProvider({ children }: { children: React.ReactNode }) {
     },
     [todayKey, basal],
   )
+
+  // Listen for external sync messages (BroadcastChannel or storage events)
+  useEffect(() => {
+    function doSync() {
+      try {
+        const externalLogs = loadLogs()
+        setLogs(externalLogs)
+        const externalProfile = loadProfile()
+        setProfileState(externalProfile)
+        const basalNow = externalProfile.auto_basal ? calcBasal(externalProfile) : externalProfile.tdee_basal
+        for (const k of Object.keys(externalLogs)) {
+          try {
+            const totals = computeTotals(externalLogs[k] ?? [], basalNow)
+            setDeficit(k, totals.deficitNeto)
+          } catch {
+            /* ignore per-day */
+          }
+        }
+        if (typeof window !== "undefined") window.dispatchEvent(new CustomEvent("deficits:changed"))
+      } catch {
+        /* ignore */
+      }
+    }
+
+    const bc = bcRef.current
+    function bcHandler(ev: MessageEvent) {
+      const msg = ev?.data
+      if (msg && msg.type === "sync") doSync()
+    }
+    if (bc) bc.addEventListener("message", bcHandler)
+
+    function storageHandler(ev: StorageEvent) {
+      if (ev.key === "nutrapp:sync") doSync()
+    }
+    if (typeof window !== "undefined") window.addEventListener("storage", storageHandler)
+
+    return () => {
+      if (bc) bc.removeEventListener("message", bcHandler)
+      if (typeof window !== "undefined") window.removeEventListener("storage", storageHandler)
+    }
+  }, [])
 
 
   const value: TrackerContextValue = {
