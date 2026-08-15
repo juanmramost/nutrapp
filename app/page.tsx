@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, Component } from "react"
 import { AnimatePresence, motion } from "motion/react"
 import { TrackerProvider, useTracker } from "@/hooks/use-tracker"
 import { AuthProvider } from "@/hooks/use-auth"
@@ -51,9 +51,50 @@ export default function Page() {
   return (
     <AuthProvider>
       <TrackerProvider>
-        <AppShell />
+        <ErrorBoundary>
+          <AppShell />
+        </ErrorBoundary>
         <AuthGate />
       </TrackerProvider>
     </AuthProvider>
   )
+}
+
+class ErrorBoundary extends Component<{ children: React.ReactNode }, { hasError: boolean; error?: any }> {
+  constructor(props: any) {
+    super(props)
+    this.state = { hasError: false }
+  }
+
+  static getDerivedStateFromError() {
+    return { hasError: true }
+  }
+
+  componentDidCatch(error: any) {
+    console.error("App caught error:", error)
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="min-h-dvh flex flex-col items-center justify-center px-4 text-center">
+          <div className="mb-4">❗ Ocurrió un error al cargar la aplicación.</div>
+          <button
+            className="rounded bg-white px-4 py-2 text-black"
+            onClick={() => {
+              try {
+                window.location.href = "/"
+              } catch {
+                window.location.reload()
+              }
+            }}
+          >
+            Recargar
+          </button>
+        </div>
+      )
+    }
+    // @ts-ignore
+    return this.props.children
+  }
 }
