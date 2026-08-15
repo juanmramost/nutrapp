@@ -22,6 +22,52 @@ export function fileToImagePart(file: File): Promise<ImagePart> {
     reader.readAsDataURL(file)
   })
 }
+
+/**
+ * Redimensiona y comprime una imagen en el cliente antes de enviarla.
+ * Devuelve un nuevo `File` en formato `image/jpeg`.
+ */
+export async function resizeImage(file: File, maxDim = 1024, quality = 0.75): Promise<File> {
+  if (!file.type.startsWith("image/")) return file
+
+  const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+    const url = URL.createObjectURL(file)
+    const i = new Image()
+    i.onload = () => {
+      URL.revokeObjectURL(url)
+      resolve(i)
+    }
+    i.onerror = (e) => {
+      URL.revokeObjectURL(url)
+      reject(new Error("No se pudo cargar la imagen para redimensionar"))
+    }
+    i.src = url
+  })
+
+  const max = Math.max(img.width, img.height)
+  if (max <= maxDim) {
+    // No hace falta redimensionar
+    return file
+  }
+
+  const scale = maxDim / max
+  const w = Math.round(img.width * scale)
+  const h = Math.round(img.height * scale)
+
+  const canvas = document.createElement("canvas")
+  canvas.width = w
+  canvas.height = h
+  const ctx = canvas.getContext("2d")
+  if (!ctx) throw new Error("No se pudo obtener el contexto de canvas")
+  ctx.drawImage(img, 0, 0, w, h)
+
+  const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/jpeg", quality))
+  if (!blob) throw new Error("No se pudo generar la imagen comprimida")
+
+  // Crear un nuevo File con el mismo nombre pero forzando jpeg
+  const name = file.name.replace(/\.[^.]+$/, "") + ".jpg"
+  return new File([blob], name, { type: "image/jpeg" })
+}
  
 interface GenerateOptions {
   apiKey: string

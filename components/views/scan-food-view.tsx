@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { ImagePicker } from "@/components/image-picker"
 import { useTracker } from "@/hooks/use-tracker"
-import { fileToImagePart } from "@/lib/gemini"
+import { fileToImagePart, resizeImage } from "@/lib/gemini"
 import { newId } from "@/lib/storage"
 import type { FoodAnalysis } from "@/lib/types"
 
@@ -75,7 +75,8 @@ export function ScanFoodView({ onSaved }: Props) {
     setLoading(true)
     setError(null)
     try {
-      const part = await fileToImagePart(file)
+      const resized = await resizeImage(file, 1024, 0.75)
+      const part = await fileToImagePart(resized)
       const res = await fetch("/api/analyze", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
