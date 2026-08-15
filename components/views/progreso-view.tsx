@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogHeader, DialogFooter, DialogTitle, DialogDescription, DialogTrigger, DialogClose } from "@/components/ui/dialog"
-import { dateKey, loadDeficits, setDeficit, removeDeficit } from "@/lib/storage"
+import { dateKey, loadDeficits, loadLogs, setDeficit, removeDeficit } from "@/lib/storage"
 
 function formatDate(k: string) {
   return k
@@ -26,12 +26,34 @@ export function ProgresoView() {
   const [confirmBulkOpen, setConfirmBulkOpen] = useState(false)
 
   useEffect(() => {
-    setDeficits(loadDeficits())
+    function loadVisibleDeficits() {
+      const d = loadDeficits()
+      const logs = loadLogs()
+      const out: Record<string, number> = {}
+      for (const k of Object.keys(d)) {
+        const entries = logs[k] ?? []
+        if (entries.length > 0) out[k] = d[k]
+      }
+      return out
+    }
+
+    setDeficits(loadVisibleDeficits())
   }, [])
 
   useEffect(() => {
+    function loadVisibleDeficits() {
+      const d = loadDeficits()
+      const logs = loadLogs()
+      const out: Record<string, number> = {}
+      for (const k of Object.keys(d)) {
+        const entries = logs[k] ?? []
+        if (entries.length > 0) out[k] = d[k]
+      }
+      return out
+    }
+
     function handler() {
-      setDeficits(loadDeficits())
+      setDeficits(loadVisibleDeficits())
     }
     if (typeof window !== "undefined") {
       window.addEventListener("deficits:changed", handler)
