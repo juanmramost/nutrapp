@@ -6,6 +6,7 @@ import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { CalorieRing } from "@/components/calorie-ring"
 import { useTracker } from "@/hooks/use-tracker"
+import { useAuth } from "@/hooks/use-auth"
 import { isMeal } from "@/lib/nutrition"
 
 function MacroBar({ label, value, max, color }: { label: string; value: number; max: number; color: string }) {
@@ -60,6 +61,7 @@ function StatCard({
 
 export function DashboardView() {
   const { totals, todayEntries, removeToday, profile } = useTracker()
+  const { user, isGuest } = useAuth()
 
   function handleRemove(id: string) {
     const ok = window.confirm("Eliminar registro de hoy?")
@@ -73,13 +75,17 @@ export function DashboardView() {
     month: "long",
   })
 
+  const displayTitle = user && !isGuest
+    ? `Progreso diario de ${user.user_metadata?.full_name || user.email?.split("@")[0]}`
+    : "Hoy"
+
   const proteinTarget = Math.round(profile.peso_kg * 2)
 
   return (
     <div className="flex flex-col gap-6 px-4 pb-4 pt-8">
       <header>
         <p className="text-sm capitalize text-muted-foreground">{today}</p>
-        <h1 className="text-2xl font-bold tracking-tight">Hoy</h1>
+        <h1 className="text-2xl font-bold tracking-tight">{displayTitle}</h1>
       </header>
 
       <Card className="items-center gap-5 p-6">

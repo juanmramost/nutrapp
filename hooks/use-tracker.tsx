@@ -17,6 +17,8 @@ import {
   setDeficit,
   removeDeficit,
 } from "@/lib/storage"
+import { getProfile, getLogs, getDeficits } from "@/lib/supabaseSync"
+import { useAuth } from "@/hooks/use-auth"
 import { calcBasal, computeTotals, type DayTotals } from "@/lib/nutrition"
 
 interface TrackerContextValue {
@@ -57,6 +59,36 @@ export function TrackerProvider({ children }: { children: React.ReactNode }) {
     }
     setReady(true)
   }, [])
+
+  // When a user logs in, try to load remote data and apply locally
+  const { user } = useAuth()
+
+  useEffect(() => {
+    async function loadRemote() {
+      if (!user) return
+      try {
+        const [remoteProfile, remoteLogs, remoteDeficits] = await Promise.all([
+          getProfile(user.id),
+          getLogs(user.id),
+          getDeficits(user.id),
+        ])
+        if (remoteProfile) {
+          setProfileState(remoteProfile)
+          try { saveProfile(remoteProfile) } catch {}
+        }
+        if (remoteLogs) {
+          setLogs(remoteLogs)
+          try { saveLogs(remoteLogs) } catch {}
+        }
+        if (remoteDeficits) {
+          try { saveDeficits(remoteDeficits) } catch {}
+        }
+      } catch {
+        /* ignore remote load errors */
+      }
+    }
+    loadRemote()
+  }, [user])
 
   const setProfile = useCallback((p: UserProfile) => {
     setProfileState(p)
