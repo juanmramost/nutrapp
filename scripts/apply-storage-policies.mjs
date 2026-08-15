@@ -7,7 +7,7 @@ const policies = [
   {
     name: 'upload_own',
     sql: `CREATE POLICY upload_own ON storage.objects
-  FOR INSERT USING (
+  FOR INSERT WITH CHECK (
     auth.role() = 'authenticated'
     AND name LIKE ('uploads/' || auth.uid() || '/%')
   );`,
