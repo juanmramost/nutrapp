@@ -96,63 +96,73 @@ export function TrackerProvider({ children }: { children: React.ReactNode }) {
     loadRemote()
   }, [user])
 
-  // Subscribe to remote changes for real-time sync
+  // Subscribe to remote changes for real-time sync (supabase-js v2 channels)
   useEffect(() => {
     if (!user) return
-    const profileSub = supabase
-      .from(`profiles:user_id=eq.${user.id}`)
-      .on("INSERT", () => {})
-      .on("UPDATE", async () => {
-        try {
-          isApplyingRemoteRef.current = true
-          const remote = await getProfile(user.id)
-          if (remote) {
-            setProfileState(remote)
-            try { saveProfile(remote) } catch {}
+
+    const profileChannel = supabase
+      .channel(`profiles-${user.id}`)
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "profiles", filter: `user_id=eq.${user.id}` },
+        async () => {
+          try {
+            isApplyingRemoteRef.current = true
+            const remote = await getProfile(user.id)
+            if (remote) {
+              setProfileState(remote)
+              try { saveProfile(remote) } catch {}
+            }
+          } finally {
+            isApplyingRemoteRef.current = false
           }
-        } finally {
-          isApplyingRemoteRef.current = false
-        }
-      })
+        },
+      )
       .subscribe()
 
-    const logsSub = supabase
-      .from(`logs:user_id=eq.${user.id}`)
-      .on("INSERT", () => {})
-      .on("UPDATE", async () => {
-        try {
-          isApplyingRemoteRef.current = true
-          const remote = await getLogs(user.id)
-          if (remote) {
-            setLogs(remote)
-            try { saveLogs(remote) } catch {}
+    const logsChannel = supabase
+      .channel(`logs-${user.id}`)
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "logs", filter: `user_id=eq.${user.id}` },
+        async () => {
+          try {
+            isApplyingRemoteRef.current = true
+            const remote = await getLogs(user.id)
+            if (remote) {
+              setLogs(remote)
+              try { saveLogs(remote) } catch {}
+            }
+          } finally {
+            isApplyingRemoteRef.current = false
           }
-        } finally {
-          isApplyingRemoteRef.current = false
-        }
-      })
+        },
+      )
       .subscribe()
 
-    const deficitsSub = supabase
-      .from(`deficits:user_id=eq.${user.id}`)
-      .on("INSERT", () => {})
-      .on("UPDATE", async () => {
-        try {
-          isApplyingRemoteRef.current = true
-          const remote = await getDeficits(user.id)
-          if (remote) {
-            try { saveDeficits(remote) } catch {}
+    const deficitsChannel = supabase
+      .channel(`deficits-${user.id}`)
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "deficits", filter: `user_id=eq.${user.id}` },
+        async () => {
+          try {
+            isApplyingRemoteRef.current = true
+            const remote = await getDeficits(user.id)
+            if (remote) {
+              try { saveDeficits(remote) } catch {}
+            }
+          } finally {
+            isApplyingRemoteRef.current = false
           }
-        } finally {
-          isApplyingRemoteRef.current = false
-        }
-      })
+        },
+      )
       .subscribe()
 
     return () => {
-      try { supabase.removeSubscription(profileSub) } catch {}
-      try { supabase.removeSubscription(logsSub) } catch {}
-      try { supabase.removeSubscription(deficitsSub) } catch {}
+      try { profileChannel.unsubscribe() } catch {}
+      try { logsChannel.unsubscribe() } catch {}
+      try { deficitsChannel.unsubscribe() } catch {}
     }
   }, [user])
 
