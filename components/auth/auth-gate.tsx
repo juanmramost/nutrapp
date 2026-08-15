@@ -4,6 +4,7 @@ import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { useAuth } from "@/hooks/use-auth"
 import supabase from "@/lib/supabaseClient"
+import GoogleIcon from "@/components/ui/icons/google-icon"
 
 export default function AuthGate() {
   const { user, isGuest, continueAsGuest, ready } = useAuth()
