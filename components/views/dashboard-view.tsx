@@ -61,6 +61,12 @@ function StatCard({
 export function DashboardView() {
   const { totals, todayEntries, removeToday, profile } = useTracker()
 
+  function handleRemove(id: string) {
+    const ok = window.confirm("Eliminar registro de hoy?")
+    if (!ok) return
+    removeToday(id)
+  }
+
   const today = new Date().toLocaleDateString("es-ES", {
     weekday: "long",
     day: "numeric",
@@ -170,7 +176,7 @@ export function DashboardView() {
                       variant="ghost"
                       size="icon"
                       className="shrink-0 text-muted-foreground hover:text-destructive"
-                      onClick={() => removeToday(entry.id)}
+                      onClick={() => handleRemove(entry.id)}
                       aria-label="Borrar registro"
                     >
                       <Trash2 className="size-4" />
