@@ -127,17 +127,15 @@ export function ScanFoodView({ onSaved }: Props) {
         accentColor="var(--food)"
       />
 
-      {file && (
-        <div className="flex flex-col gap-1.5">
-          <Label className="text-xs text-muted-foreground">Detalles (opcional)</Label>
-          <Input
-            value={detalles}
-            onChange={(e) => setDetalles(e.target.value)}
-            placeholder="añade aqui informacion adicional sobre tu plato"
-            className="h-12"
-          />
-        </div>
-      )}
+      <div className="flex flex-col gap-1.5 mt-3">
+        <Label className="text-xs text-muted-foreground">Detalles (opcional)</Label>
+        <Input
+          value={detalles}
+          onChange={(e) => setDetalles(e.target.value)}
+          placeholder="añade aqui informacion adicional sobre tu plato"
+          className="h-12"
+        />
+      </div>
 
       {file && !result && (
         <Button
