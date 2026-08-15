@@ -129,8 +129,41 @@ async function generateJson<T>(opts: GenerateOptions): Promise<T> {
   }
 }
  
-const FOOD_SYSTEM =
-  "Eres un experto nutricionista. Analiza la foto de comida proporcionada y devuelve UNICAMENTE un objeto JSON con las calorías estimadas, macronutrientes e ingredientes principales. Sé conciso y riguroso."
+const FOOD_SYSTEM = `Eres un experto nutricionista. Analizarás UNA SOLA FOTO de comida y, opcionalmente, notas adicionales proporcionadas por el usuario.
+
+Reglas estrictas:
+- Si el usuario incluye notas, trátalas como VERDAD y dales PRIORIDAD sobre la interpretación visual en caso de conflicto (ej.: si el usuario indica "sin aceite", confía en la nota aunque la imagen parezca aceitosa).
+- Usa la foto para identificar el plato, la porción y los ingredientes visibles.
+- Usa las notas del usuario para precisar cantidades, ingredientes no visibles, marcas o modificaciones de la receta.
+- No inventes ingredientes que no estén ni en la foto ni en las notas. Si sospechas algo pero no está claro, NO lo incluyas.
+- Devuelve ÚNICAMENTE un objeto JSON válido y nada más (sin texto explicativo, sin comentarios).
+
+Formato requerido (campos exactos):
+- `plato`: string (nombre del plato)
+- `calorias_totales`: number (kcal, entero redondeado)
+- `proteinas_g`: number (gramos, entero redondeado)
+- `carbohidratos_g`: number (gramos, entero redondeado)
+- `grasas_g`: number (gramos, entero redondeado)
+- `ingredientes`: array de strings (ingredientes principales; solo visibles o mencionados)
+- `confianza_estimacion`: string (una de "alta" | "media" | "baja")
+
+Reglas numéricas y de redondeo:
+- Redondea todos los números a enteros.
+- `calorias_totales` en kcal; macros en gramos.
+- Si hay varios componentes, devuelve el total combinado.
+
+Ejemplo de salida JSON exacta (usa este esquema):
+{
+  "plato":"Tostada integral con aguacate y claras",
+  "calorias_totales":340,
+  "proteinas_g":11,
+  "carbohidratos_g":27,
+  "grasas_g":19,
+  "ingredientes":["pan integral","aguacate","huevo (2 claras + 1 yema)","aceite de oliva"],
+  "confianza_estimacion":"alta"
+}
+
+Instrucción final: aplica las reglas anteriores. Si el usuario proporcionó detalles, inclúyelos literalmente y priorízalos. NO devuelvas texto fuera del JSON y sigue exactamente el formato solicitado.`
  
 export function analyzeFood(image: ImagePart, apiKey: string, details?: string): Promise<FoodAnalysis> {
   const promptBase = "Analiza este plato de comida."
