@@ -86,7 +86,7 @@ export function WorkoutView({ onSaved }: Props) {
   const manualValid = tipo.trim().length > 0 && Number(kcal) > 0
 
   return (
-    <div className="flex flex-col gap-5 px-4 pb-4 pt-6">
+    <div className="flex flex-col gap-5 px-4 pb-4 pt-8">
       <header>
         <h1 className="text-2xl font-bold tracking-tight">Registrar entreno</h1>
         <p className="text-sm text-muted-foreground">Sube una captura de tu reloj o introduce los datos a mano</p>

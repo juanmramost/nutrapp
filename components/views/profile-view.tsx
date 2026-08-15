@@ -65,7 +65,7 @@ export function ProfileView() {
 
 
   return (
-    <div className="flex flex-col gap-5 px-4 pb-4 pt-6">
+    <div className="flex flex-col gap-5 px-4 pb-4 pt-8">
       <header>
         <h1 className="text-2xl font-bold tracking-tight">Perfil y ajustes</h1>
         <p className="text-sm text-muted-foreground">Tus datos definen tu gasto calórico en reposo</p>

@@ -54,6 +54,7 @@ export function ScanFoodView({ onSaved }: Props) {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [result, setResult] = useState<FoodAnalysis | null>(null)
+  const [detalles, setDetalles] = useState<string>("")
 
   function reset() {
     setFile(null)
@@ -61,6 +62,7 @@ export function ScanFoodView({ onSaved }: Props) {
     setPreviewUrl(null)
     setResult(null)
     setError(null)
+    setDetalles("")
   }
 
   function handleSelect(f: File) {
@@ -80,7 +82,7 @@ export function ScanFoodView({ onSaved }: Props) {
       const res = await fetch("/api/analyze", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ mode: "food", image: part }),
+        body: JSON.stringify({ mode: "food", image: part, details: detalles }),
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data?.error || "Error al analizar la foto")
@@ -103,6 +105,7 @@ export function ScanFoodView({ onSaved }: Props) {
       carbohidratos_g: Math.round(result.carbohidratos_g),
       grasas_g: Math.round(result.grasas_g),
       ingredientes: result.ingredientes,
+      detalles: detalles || undefined,
       confianza: result.confianza_estimacion,
       createdAt: Date.now(),
     })
@@ -111,7 +114,7 @@ export function ScanFoodView({ onSaved }: Props) {
   }
 
   return (
-    <div className="flex flex-col gap-5 px-4 pb-4 pt-6">
+    <div className="flex flex-col gap-5 px-4 pb-4 pt-8">
       <header>
         <h1 className="text-2xl font-bold tracking-tight">Escanear comida</h1>
         <p className="text-sm text-muted-foreground">Fotografía tu plato y deja que la IA calcule las calorías</p>
@@ -167,6 +170,16 @@ export function ScanFoodView({ onSaved }: Props) {
               <Input
                 value={result.plato}
                 onChange={(e) => setResult({ ...result, plato: e.target.value })}
+                className="h-12"
+              />
+            </div>
+
+            <div className="flex flex-col gap-1.5">
+              <Label className="text-xs text-muted-foreground">Detalles (opcional)</Label>
+              <Input
+                value={detalles}
+                onChange={(e) => setDetalles(e.target.value)}
+                placeholder="añade aqui informacion adicional sobre tu plato"
                 className="h-12"
               />
             </div>

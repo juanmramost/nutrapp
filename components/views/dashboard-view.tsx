@@ -76,7 +76,7 @@ export function DashboardView() {
   const proteinTarget = Math.round(profile.peso_kg * 2)
 
   return (
-    <div className="flex flex-col gap-6 px-4 pb-4 pt-6">
+    <div className="flex flex-col gap-6 px-4 pb-4 pt-8">
       <header>
         <p className="text-sm capitalize text-muted-foreground">{today}</p>
         <h1 className="text-2xl font-bold tracking-tight">Hoy</h1>

@@ -21,6 +21,7 @@ export interface MealEntry {
   grasas_g: number
   ingredientes: string[]
   confianza?: string
+  detalles?: string
   createdAt: number
 }
 

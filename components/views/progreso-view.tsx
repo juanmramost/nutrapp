@@ -108,7 +108,7 @@ export function ProgresoView() {
   const weeklyTotal = last7.reduce((s, d) => s + (deficits[d] ?? 0), 0)
 
   return (
-    <div className="flex flex-col gap-5 px-4 pb-4 pt-6">
+    <div className="flex flex-col gap-5 px-4 pb-4 pt-8">
       <header>
         <h1 className="text-2xl font-bold tracking-tight">Progreso</h1>
         <p className="text-sm text-muted-foreground">Registra el déficit diario y revisa el total semanal</p>
