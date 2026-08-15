@@ -89,18 +89,29 @@ export function TrackerProvider({ children }: { children: React.ReactNode }) {
 
   const removeDay = useCallback(
     (dk: string) => {
-      setLogs((prev) => {
-        const next = { ...prev }
-        if (next[dk]) delete next[dk]
-        saveLogs(next)
-        try {
-          removeDeficit(dk)
-        } catch {}
-        return next
-      })
+      // remove from storage
+      try {
+        const current = loadLogs()
+        if (current[dk]) delete current[dk]
+        saveLogs(current)
+      } catch {}
+      try {
+        removeDeficit(dk)
+      } catch {}
 
+      // force local state reload
+      try {
+        setLogs(loadLogs())
+      } catch {}
+
+      // emit sync events for other contexts
       if (typeof window !== "undefined") {
-        window.dispatchEvent(new CustomEvent("deficits:changed", { detail: { key: dk } }))
+        try {
+          window.dispatchEvent(new CustomEvent("deficits:changed", { detail: { key: dk } }))
+        } catch {}
+        try {
+          window.dispatchEvent(new CustomEvent("logs:changed", { detail: { key: dk } }))
+        } catch {}
         try {
           bcRef.current?.postMessage({ type: "sync", key: dk })
         } catch {}
