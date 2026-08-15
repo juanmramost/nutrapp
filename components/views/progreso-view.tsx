@@ -3,8 +3,7 @@
 import { useEffect, useMemo, useState } from "react"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
+import { Dialog, DialogContent, DialogHeader, DialogFooter, DialogTitle, DialogDescription, DialogTrigger, DialogClose } from "@/components/ui/dialog"
 import { dateKey, loadDeficits, setDeficit, removeDeficit } from "@/lib/storage"
 
 function formatDate(k: string) {
@@ -23,24 +22,37 @@ function lastNDates(n: number) {
 
 export function ProgresoView() {
   const today = dateKey()
-  const [selectedDate, setSelectedDate] = useState<string>(today)
-  const [kcal, setKcal] = useState<number | "">("")
   const [deficits, setDeficits] = useState<Record<string, number>>({})
+  const [confirmKey, setConfirmKey] = useState<string | null>(null)
+  const [confirmBulkOpen, setConfirmBulkOpen] = useState(false)
 
   useEffect(() => {
     setDeficits(loadDeficits())
   }, [])
 
-  function handleSave() {
-    if (kcal === "") return
-    setDeficit(selectedDate, Number(kcal))
-    setDeficits(loadDeficits())
-    setKcal("")
+  function handleDelete(dk: string) {
+    // ask for confirmation first
+    setConfirmKey(dk)
   }
 
-  function handleDelete(dk: string) {
-    removeDeficit(dk)
+  function confirmDelete() {
+    if (!confirmKey) return
+    removeDeficit(confirmKey)
     setDeficits(loadDeficits())
+    setConfirmKey(null)
+  }
+
+  function handleBulkDelete() {
+    setConfirmBulkOpen(true)
+  }
+
+  function confirmBulkDelete() {
+    const keys = last7
+    for (const k of keys) {
+      removeDeficit(k)
+    }
+    setDeficits(loadDeficits())
+    setConfirmBulkOpen(false)
   }
 
   const last7 = useMemo(() => lastNDates(7), [])
@@ -80,9 +92,9 @@ export function ProgresoView() {
                     <td className="py-2">{formatDate(d)}</td>
                     <td className="py-2">{deficits[d]}</td>
                     <td className="py-2">
-                      <Button variant="ghost" onClick={() => handleDelete(d)}>
-                        Eliminar
-                      </Button>
+                          <Button variant="ghost" onClick={() => handleDelete(d)}>
+                            Eliminar
+                          </Button>
                     </td>
                   </tr>
                 ))}
@@ -110,7 +122,48 @@ export function ProgresoView() {
             </div>
           ))}
         </div>
+        <div className="mt-4 flex gap-2">
+          <Button variant="secondary" onClick={handleBulkDelete} className="w-full">
+            Eliminar últimos 7 registros
+          </Button>
+        </div>
       </Card>
+
+      {/* Confirm delete single */}
+      <Dialog open={!!confirmKey} onOpenChange={(open) => !open && setConfirmKey(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Confirmar eliminación</DialogTitle>
+            <DialogDescription>¿Eliminar el registro para la fecha {confirmKey}?</DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <DialogClose>
+              <Button variant="outline">Cancelar</Button>
+            </DialogClose>
+            <Button onClick={confirmDelete} className="bg-destructive text-destructive-foreground">
+              Eliminar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Confirm bulk delete */}
+      <Dialog open={confirmBulkOpen} onOpenChange={setConfirmBulkOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Eliminar últimos registros</DialogTitle>
+            <DialogDescription>Se eliminarán los registros de los últimos 7 días. ¿Confirmas?</DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <DialogClose>
+              <Button variant="outline">Cancelar</Button>
+            </DialogClose>
+            <Button onClick={confirmBulkDelete} className="bg-destructive text-destructive-foreground">
+              Eliminar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
