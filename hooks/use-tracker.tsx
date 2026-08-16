@@ -3,7 +3,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react"
 import type { DailyLogs, LogEntry, UserProfile } from "@/lib/types"
 import {
-  DEFAULT_PROFILE,
   addEntry,
   dateKey,
   loadApiKey,
@@ -42,16 +41,13 @@ const TrackerContext = createContext<TrackerContextValue | null>(null)
 
 export function TrackerProvider({ children }: { children: React.ReactNode }) {
   const [ready, setReady] = useState(false)
-  const [profile, setProfileState] = useState<UserProfile>(DEFAULT_PROFILE)
-  const [logs, setLogs] = useState<DailyLogs>({})
-  const [apiKey, setApiKeyState] = useState("")
+  const [profile, setProfileState] = useState<UserProfile>(() => loadProfile())
+  const [logs, setLogs] = useState<DailyLogs>(() => loadLogs())
+  const [apiKey, setApiKeyState] = useState(() => loadApiKey())
   const todayKey = useMemo(() => dateKey(), [])
   const bcRef = useRef<BroadcastChannel | null>(null)
 
   useEffect(() => {
-    setProfileState(loadProfile())
-    setLogs(loadLogs())
-    setApiKeyState(loadApiKey())
     if (typeof BroadcastChannel !== "undefined") {
       try {
         bcRef.current = new BroadcastChannel("nutrapp-sync")
@@ -59,7 +55,8 @@ export function TrackerProvider({ children }: { children: React.ReactNode }) {
         bcRef.current = null
       }
     }
-    setReady(true)
+    const readyFrame = window.requestAnimationFrame(() => setReady(true))
+    return () => window.cancelAnimationFrame(readyFrame)
   }, [])
 
   // When a user logs in, try to load remote data and apply locally
@@ -185,7 +182,7 @@ export function TrackerProvider({ children }: { children: React.ReactNode }) {
         void upsertProfile(user.id, p)
       }
     } catch {}
-  }, [todayKey])
+  }, [todayKey, user])
 
   const setApiKey = useCallback((k: string) => {
     setApiKeyState(k)
@@ -218,6 +215,14 @@ export function TrackerProvider({ children }: { children: React.ReactNode }) {
         setLogs(loadLogs())
       } catch {}
 
+      // push logs & deficits to remote if logged in
+      try {
+        if (user && !isApplyingRemoteRef.current) {
+          void upsertLogs(user.id, loadLogs())
+          void upsertDeficits(user.id, loadDeficits())
+        }
+      } catch {}
+
       // emit sync events for other contexts
       if (typeof window !== "undefined") {
         try {
@@ -234,7 +239,7 @@ export function TrackerProvider({ children }: { children: React.ReactNode }) {
         } catch {}
       }
     },
-    [],
+    [user],
   )
 
   const addToday = useCallback(
@@ -268,7 +273,7 @@ export function TrackerProvider({ children }: { children: React.ReactNode }) {
         return next
       })
     },
-    [todayKey, basal],
+    [todayKey, basal, user],
   )
 
   const removeToday = useCallback(
@@ -301,7 +306,7 @@ export function TrackerProvider({ children }: { children: React.ReactNode }) {
         return next
       })
     },
-    [todayKey, basal],
+    [todayKey, basal, user],
   )
 
   const updateToday = useCallback(
@@ -334,7 +339,7 @@ export function TrackerProvider({ children }: { children: React.ReactNode }) {
         return next
       })
     },
-    [todayKey, basal],
+    [todayKey, basal, user],
   )
 
   // Listen for external sync messages (BroadcastChannel or storage events)

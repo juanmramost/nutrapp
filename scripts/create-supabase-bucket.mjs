@@ -14,7 +14,7 @@ const admin = createClient(url, key, { auth: { persistSession: false } })
 async function run() {
   const bucket = 'uploads'
   try {
-    const { data, error } = await admin.storage.createBucket(bucket, { public: false })
+    const { error } = await admin.storage.createBucket(bucket, { public: false })
     if (error) {
       // If bucket already exists, supabase returns an error; handle gracefully
       if (error.message && /already exists/i.test(error.message)) {

@@ -37,7 +37,7 @@ export async function resizeImage(file: File, maxDim = 1024, quality = 0.75): Pr
       URL.revokeObjectURL(url)
       resolve(i)
     }
-    i.onerror = (e) => {
+    i.onerror = () => {
       URL.revokeObjectURL(url)
       reject(new Error("No se pudo cargar la imagen para redimensionar"))
     }

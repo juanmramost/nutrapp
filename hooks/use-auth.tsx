@@ -4,7 +4,7 @@ import { createContext, useContext, useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import supabase from "@/lib/supabaseClient"
 import { migrateLocalToRemote } from "@/lib/supabaseSync"
-import { loadProfile, loadLogs } from "@/lib/storage"
+import { loadProfile, loadLogs, loadDeficits } from "@/lib/storage"
 import { User } from "@supabase/supabase-js"
 
 type AuthContextValue = {
@@ -20,15 +20,11 @@ const AuthContext = createContext<AuthContextValue | null>(null)
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
-  const [isGuest, setIsGuest] = useState(false)
+  const [isGuest, setIsGuest] = useState(() => typeof window !== "undefined" && localStorage.getItem("nutrapp:guest") === "1")
   const [ready, setReady] = useState(false)
   const router = useRouter()
 
   useEffect(() => {
-    // check guest flag
-    const guest = typeof window !== "undefined" && localStorage.getItem("nutrapp:guest") === "1"
-    setIsGuest(Boolean(guest))
-
     supabase.auth.getSession().then(({ data }) => {
       setUser(data.session?.user ?? null)
       setReady(true)
@@ -41,7 +37,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setIsGuest(false)
         // attempt to migrate local data to remote if present
         try {
-          const local = { profile: loadProfile(), logs: loadLogs() }
+          const local = { profile: loadProfile(), logs: loadLogs(), deficits: loadDeficits() }
           await migrateLocalToRemote(u.id, local)
           // mark migrated for this user
           if (typeof window !== "undefined") localStorage.setItem(`nutrapp:migrated:${u.id}`, "1")
@@ -78,7 +74,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       try {
         router.push("/")
       } catch {
-        if (typeof window !== "undefined") window.location.href = "/"
+        if (typeof window !== "undefined") window.location.reload()
       }
     }
   }

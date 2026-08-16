@@ -1,10 +1,10 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useState } from "react"
 import { useTracker } from "@/hooks/use-tracker"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Dialog, DialogContent, DialogHeader, DialogFooter, DialogTitle, DialogDescription, DialogTrigger, DialogClose } from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogHeader, DialogFooter, DialogTitle, DialogDescription, DialogClose } from "@/components/ui/dialog"
 import { dateKey, loadDeficits, loadLogs } from "@/lib/storage"
 
 function formatDate(k: string) {
@@ -21,38 +21,17 @@ function lastNDates(n: number) {
   return arr
 }
 
+function loadVisibleDeficits() {
+  const deficits = loadDeficits()
+  const logs = loadLogs()
+  return Object.fromEntries(Object.entries(deficits).filter(([key]) => (logs[key] ?? []).length > 0))
+}
+
 export function ProgresoView() {
-  const today = dateKey()
-  const [deficits, setDeficits] = useState<Record<string, number>>({})
+  const [deficits, setDeficits] = useState<Record<string, number>>(() => loadVisibleDeficits())
   const [confirmBulkOpen, setConfirmBulkOpen] = useState(false)
 
   useEffect(() => {
-    function loadVisibleDeficits() {
-      const d = loadDeficits()
-      const logs = loadLogs()
-      const out: Record<string, number> = {}
-      for (const k of Object.keys(d)) {
-        const entries = logs[k] ?? []
-        if (entries.length > 0) out[k] = d[k]
-      }
-      return out
-    }
-
-    setDeficits(loadVisibleDeficits())
-  }, [])
-
-  useEffect(() => {
-    function loadVisibleDeficits() {
-      const d = loadDeficits()
-      const logs = loadLogs()
-      const out: Record<string, number> = {}
-      for (const k of Object.keys(d)) {
-        const entries = logs[k] ?? []
-        if (entries.length > 0) out[k] = d[k]
-      }
-      return out
-    }
-
     function handler() {
       setDeficits(loadVisibleDeficits())
     }
@@ -73,14 +52,7 @@ export function ProgresoView() {
     if (!ok) return
     removeDay(dk)
     // reload visible deficits
-    const d = loadDeficits()
-    const logs = loadLogs()
-    const out: Record<string, number> = {}
-    for (const k of Object.keys(d)) {
-      const entries = logs[k] ?? []
-      if (entries.length > 0) out[k] = d[k]
-    }
-    setDeficits(out)
+    setDeficits(loadVisibleDeficits())
   }
 
   function handleBulkDelete() {
@@ -93,18 +65,11 @@ export function ProgresoView() {
       removeDay(k)
     }
     // reload visible deficits
-    const d = loadDeficits()
-    const logs = loadLogs()
-    const out: Record<string, number> = {}
-    for (const k of Object.keys(d)) {
-      const entries = logs[k] ?? []
-      if (entries.length > 0) out[k] = d[k]
-    }
-    setDeficits(out)
+    setDeficits(loadVisibleDeficits())
     setConfirmBulkOpen(false)
   }
 
-  const last7 = useMemo(() => lastNDates(7), [])
+  const last7 = lastNDates(7)
   const weeklyTotal = last7.reduce((s, d) => s + (deficits[d] ?? 0), 0)
 
   return (

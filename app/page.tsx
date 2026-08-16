@@ -60,17 +60,20 @@ export default function Page() {
   )
 }
 
-class ErrorBoundary extends Component<{ children: React.ReactNode }, { hasError: boolean; error?: any }> {
-  constructor(props: any) {
+type ErrorBoundaryProps = { children: React.ReactNode }
+type ErrorBoundaryState = { hasError: boolean }
+
+class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
+  constructor(props: ErrorBoundaryProps) {
     super(props)
     this.state = { hasError: false }
   }
 
-  static getDerivedStateFromError() {
+  static getDerivedStateFromError(): ErrorBoundaryState {
     return { hasError: true }
   }
 
-  componentDidCatch(error: any) {
+  componentDidCatch(error: Error) {
     console.error("App caught error:", error)
   }
 
@@ -82,11 +85,7 @@ class ErrorBoundary extends Component<{ children: React.ReactNode }, { hasError:
           <button
             className="rounded bg-white px-4 py-2 text-black"
             onClick={() => {
-              try {
-                window.location.href = "/"
-              } catch {
-                window.location.reload()
-              }
+              window.location.reload()
             }}
           >
             Recargar
@@ -94,7 +93,6 @@ class ErrorBoundary extends Component<{ children: React.ReactNode }, { hasError:
         </div>
       )
     }
-    // @ts-ignore
     return this.props.children
   }
 }

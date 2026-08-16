@@ -11,6 +11,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { ImagePicker } from "@/components/image-picker"
 import { useTracker } from "@/hooks/use-tracker"
 import { fileToImagePart, resizeImage } from "@/lib/gemini"
+import supabase from "@/lib/supabaseClient"
 import { newId } from "@/lib/storage"
 import type { WorkoutAnalysis } from "@/lib/types"
 
@@ -52,11 +53,17 @@ export function WorkoutView({ onSaved }: Props) {
     setLoading(true)
     setError(null)
     try {
+      const { data: sessionData } = await supabase.auth.getSession()
+      const session = sessionData.session
+      if (!session) throw new Error("Inicia sesión para usar el análisis con IA")
       const resized = await resizeImage(file, 1024, 0.75)
       const part = await fileToImagePart(resized)
       const res = await fetch("/api/analyze", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session.access_token}`,
+        },
         body: JSON.stringify({ mode: "workout", image: part }),
       })
       const data = await res.json()

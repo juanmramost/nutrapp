@@ -78,35 +78,29 @@ export function ScanFoodView({ onSaved }: Props) {
     setLoading(true)
     setError(null)
     try {
+      const { data: sessionData } = await supabase.auth.getSession()
+      const session = sessionData.session
+      if (!session) throw new Error("Inicia sesión para usar el análisis con IA")
+      const headers = {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${session.access_token}`,
+      }
       const resized = await resizeImage(file, 1024, 0.75)
-      // If user is authenticated, upload to Supabase Storage and send imagePath to server
       let res
       try {
-        const userResp = await supabase.auth.getUser()
-        const user = userResp?.data?.user
-        if (user) {
-          const path = `uploads/${user.id}/${Date.now()}.jpg`
-          const { error: upErr } = await supabase.storage.from("uploads").upload(path, resized, { upsert: true })
-          if (upErr) throw upErr
-          res = await fetch("/api/analyze", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ mode: "food", imagePath: path, details: detalles }),
-          })
-        } else {
-          const part = await fileToImagePart(resized)
-          res = await fetch("/api/analyze", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ mode: "food", image: part, details: detalles }),
-          })
-        }
-      } catch (uploadErr) {
-        // fallback to sending base64
+        const path = `uploads/${session.user.id}/${Date.now()}.jpg`
+        const { error: upErr } = await supabase.storage.from("uploads").upload(path, resized, { upsert: true })
+        if (upErr) throw upErr
+        res = await fetch("/api/analyze", {
+          method: "POST",
+          headers,
+          body: JSON.stringify({ mode: "food", imagePath: path, details: detalles }),
+        })
+      } catch {
         const part = await fileToImagePart(resized)
         res = await fetch("/api/analyze", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers,
           body: JSON.stringify({ mode: "food", image: part, details: detalles }),
         })
       }

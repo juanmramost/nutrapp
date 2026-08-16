@@ -1,10 +1,15 @@
 "use client"
 import { useState } from "react"
+import { useRouter } from "next/navigation"
 import supabase from "@/lib/supabaseClient"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import GoogleIcon from "@/components/ui/icons/google-icon"
+
+function getErrorMessage(error: unknown, fallback: string) {
+  return error instanceof Error ? error.message : fallback
+}
 
 export default function LoginPage() {
   const [mode, setMode] = useState<"login" | "signup">("login")
@@ -13,6 +18,7 @@ export default function LoginPage() {
   const [password2, setPassword2] = useState("")
   const [loading, setLoading] = useState(false)
   const [message, setMessage] = useState<string | null>(null)
+  const router = useRouter()
 
   async function handleSignIn(e: React.FormEvent) {
     e.preventDefault()
@@ -22,9 +28,9 @@ export default function LoginPage() {
       const { error } = await supabase.auth.signInWithPassword({ email, password })
       if (error) throw error
       setMessage("Sesión iniciada. Redirigiendo...")
-      setTimeout(() => (window.location.href = "/"), 800)
-    } catch (err: any) {
-      setMessage(err.message || "Error al iniciar sesión")
+      setTimeout(() => router.push("/"), 800)
+    } catch (err: unknown) {
+      setMessage(getErrorMessage(err, "Error al iniciar sesión"))
     } finally {
       setLoading(false)
     }
@@ -39,9 +45,9 @@ export default function LoginPage() {
       const { error } = await supabase.auth.signUp({ email, password })
       if (error) throw error
       setMessage("Cuenta creada. Revisa tu correo para confirmar (si aplica). Redirigiendo...")
-      setTimeout(() => (window.location.href = "/"), 1200)
-    } catch (err: any) {
-      setMessage(err.message || "Error al registrarse")
+      setTimeout(() => router.push("/"), 1200)
+    } catch (err: unknown) {
+      setMessage(getErrorMessage(err, "Error al registrarse"))
     } finally {
       setLoading(false)
     }
@@ -53,8 +59,8 @@ export default function LoginPage() {
       const { error } = await supabase.auth.signInWithOAuth({ provider: "google" })
       if (error) throw error
       // OAuth will redirect away; nothing else to do here.
-    } catch (err: any) {
-      const text = err?.message || String(err)
+    } catch (err: unknown) {
+      const text = getErrorMessage(err, "Error al iniciar sesión con Google")
       if (text.includes("provider is not enabled") || text.includes("unsupported provider")) {
         setMessage(
           "Google OAuth no está habilitado en Supabase. Habilítalo en Authentication → Providers y añade la URL de redirección de tu app."
@@ -121,7 +127,10 @@ export default function LoginPage() {
             </button>
 
             <button
-              onClick={() => { localStorage.setItem("nutrapp:guest", "1"); window.location.href = "/" }}
+              onClick={() => {
+                localStorage.setItem("nutrapp:guest", "1")
+                router.push("/")
+              }}
               className="rounded-xl border px-3 py-2 text-sm bg-transparent"
               type="button"
             >

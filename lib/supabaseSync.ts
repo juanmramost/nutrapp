@@ -3,32 +3,51 @@ import type { DailyLogs, UserProfile } from "./types"
 
 export async function getProfile(userId: string): Promise<UserProfile | null> {
   const { data, error } = await supabase.from("profiles").select("data").eq("user_id", userId).single()
-  if (error) return null
+  if (error) {
+    // log for easier debugging in the browser console
+    console.error("supabase:getProfile error", { userId, error })
+    return null
+  }
   return (data?.data as UserProfile) ?? null
 }
 
 export async function upsertProfile(userId: string, profile: UserProfile) {
-  await supabase.from("profiles").upsert({ user_id: userId, data: profile })
+  const { error } = await supabase.from("profiles").upsert({ user_id: userId, data: profile })
+  if (error) {
+    console.error("supabase:upsertProfile error", { userId, error })
+  }
 }
 
 export async function getLogs(userId: string): Promise<DailyLogs | null> {
   const { data, error } = await supabase.from("logs").select("data").eq("user_id", userId).single()
-  if (error) return null
+  if (error) {
+    console.error("supabase:getLogs error", { userId, error })
+    return null
+  }
   return (data?.data as DailyLogs) ?? null
 }
 
 export async function upsertLogs(userId: string, logs: DailyLogs) {
-  await supabase.from("logs").upsert({ user_id: userId, data: logs })
+  const { error } = await supabase.from("logs").upsert({ user_id: userId, data: logs })
+  if (error) {
+    console.error("supabase:upsertLogs error", { userId, error })
+  }
 }
 
 export async function getDeficits(userId: string): Promise<Record<string, number> | null> {
   const { data, error } = await supabase.from("deficits").select("data").eq("user_id", userId).single()
-  if (error) return null
+  if (error) {
+    console.error("supabase:getDeficits error", { userId, error })
+    return null
+  }
   return (data?.data as Record<string, number>) ?? null
 }
 
 export async function upsertDeficits(userId: string, deficits: Record<string, number>) {
-  await supabase.from("deficits").upsert({ user_id: userId, data: deficits })
+  const { error } = await supabase.from("deficits").upsert({ user_id: userId, data: deficits })
+  if (error) {
+    console.error("supabase:upsertDeficits error", { userId, error })
+  }
 }
 
 // Migrate local storage data to Supabase if remote is empty. Returns true if migrated or nothing to do.

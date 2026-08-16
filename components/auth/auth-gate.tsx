@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useState } from "react"
 import { useRouter } from "next/navigation"
 import { useAuth } from "@/hooks/use-auth"
 import supabase from "@/lib/supabaseClient"
@@ -8,21 +8,18 @@ import GoogleIcon from "@/components/ui/icons/google-icon"
 
 export default function AuthGate() {
   const { user, isGuest, continueAsGuest, ready } = useAuth()
-  const [show, setShow] = useState(false)
+  const [dismissed, setDismissed] = useState(false)
   const router = useRouter()
 
-  useEffect(() => {
-    if (!ready) return
-    const seen = typeof window !== "undefined" && localStorage.getItem("nutrapp:seenAuthGate") === "1"
-    if (!user && !isGuest && !seen) setShow(true)
-  }, [user, isGuest, ready])
+  const seen = typeof window !== "undefined" && localStorage.getItem("nutrapp:seenAuthGate") === "1"
+  const show = ready && !user && !isGuest && !seen && !dismissed
 
   if (!show) return null
 
   function handleGuest() {
     continueAsGuest()
     localStorage.setItem("nutrapp:seenAuthGate", "1")
-    setShow(false)
+    setDismissed(true)
   }
 
   function handleLogin() {
@@ -34,8 +31,8 @@ export default function AuthGate() {
     try {
       const { error } = await supabase.auth.signInWithOAuth({ provider: "google" })
       if (error) throw error
-    } catch (err: any) {
-      const text = err?.message || String(err)
+    } catch (err: unknown) {
+      const text = err instanceof Error ? err.message : "Error al iniciar con Google"
       // show a friendly alert and fallback to login page
       alert(
         text.includes("provider is not enabled") || text.includes("unsupported provider")
