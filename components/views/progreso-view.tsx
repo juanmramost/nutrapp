@@ -138,7 +138,7 @@ export function ProgresoView() {
         </div>
         <div className="mt-4 flex gap-2">
           <Button variant="secondary" onClick={handleBulkDelete} className="w-full">
-            Eliminar últimos 7 registros
+            Eliminar últimos 7 días
           </Button>
         </div>
       </Card>
@@ -153,9 +153,7 @@ export function ProgresoView() {
             <DialogDescription>Se eliminarán los registros de los últimos 7 días. ¿Confirmas?</DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <DialogClose>
-              <Button variant="outline">Cancelar</Button>
-            </DialogClose>
+            <DialogClose render={<Button variant="outline" />}>Cancelar</DialogClose>
             <Button onClick={confirmBulkDelete} className="bg-destructive text-destructive-foreground">
               Eliminar
             </Button>

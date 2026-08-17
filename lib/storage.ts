@@ -2,7 +2,6 @@ import type { DailyLogs, LogEntry, UserProfile } from "./types"
 
 const PROFILE_KEY = "user_profile"
 const LOGS_KEY = "daily_logs"
-const API_KEY_KEY = "gemini_api_key"
 
 export const DEFAULT_PROFILE: UserProfile = {
   peso_kg: 75,
@@ -26,13 +25,18 @@ export function dateKey(date: Date = new Date()): string {
 }
 
 export function loadProfile(): UserProfile {
-  if (!isBrowser()) return DEFAULT_PROFILE
+  return loadStoredProfile() ?? DEFAULT_PROFILE
+}
+
+/** Devuelve el perfil guardado, o null si nunca se ha guardado ninguno. */
+export function loadStoredProfile(): UserProfile | null {
+  if (!isBrowser()) return null
   try {
     const raw = localStorage.getItem(PROFILE_KEY)
-    if (!raw) return DEFAULT_PROFILE
+    if (!raw) return null
     return { ...DEFAULT_PROFILE, ...JSON.parse(raw) }
   } catch {
-    return DEFAULT_PROFILE
+    return null
   }
 }
 
@@ -71,16 +75,6 @@ export function removeEntry(logs: DailyLogs, key: string, id: string): DailyLogs
 export function updateEntry(logs: DailyLogs, key: string, entry: LogEntry): DailyLogs {
   if (!logs[key]) return logs
   return { ...logs, [key]: logs[key].map((e) => (e.id === entry.id ? entry : e)) }
-}
-
-export function loadApiKey(): string {
-  if (!isBrowser()) return ""
-  return localStorage.getItem(API_KEY_KEY) || process.env.NEXT_PUBLIC_GEMINI_API_KEY || ""
-}
-
-export function saveApiKey(key: string) {
-  if (!isBrowser()) return
-  localStorage.setItem(API_KEY_KEY, key.trim())
 }
 
 const DEFICITS_KEY = "daily_deficits"
@@ -124,4 +118,32 @@ export function removeDeficit(dateKey: string) {
 
 export function newId(): string {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+}
+
+/** Borra los datos de la app en localStorage (perfil, logs y déficits). */
+export function clearLocalData() {
+  if (!isBrowser()) return
+  localStorage.removeItem(PROFILE_KEY)
+  localStorage.removeItem(LOGS_KEY)
+  localStorage.removeItem(DEFICITS_KEY)
+  // Legacy: client-side Gemini key from older versions
+  localStorage.removeItem("gemini_api_key")
+}
+
+/**
+ * Fusiona dos conjuntos de logs por id de entrada dentro de cada día.
+ * Ante el mismo id, gana la entrada de `base`.
+ */
+export function mergeLogs(base: DailyLogs, extra: DailyLogs): DailyLogs {
+  const result: DailyLogs = {}
+  const keys = new Set([...Object.keys(base), ...Object.keys(extra)])
+  for (const k of keys) {
+    const byId = new Map<string, LogEntry>()
+    for (const e of [...(base[k] ?? []), ...(extra[k] ?? [])]) {
+      if (!byId.has(e.id)) byId.set(e.id, e)
+    }
+    const day = [...byId.values()].sort((a, b) => a.createdAt - b.createdAt)
+    if (day.length > 0) result[k] = day
+  }
+  return result
 }

@@ -1,25 +1,44 @@
-import { createClient } from "@supabase/supabase-js"
+import { createClient, type SupabaseClient } from "@supabase/supabase-js"
 
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL || "",
-  process.env.SUPABASE_SERVICE_ROLE_KEY || ""
-)
+let cachedAdmin: SupabaseClient | null = null
 
-export default supabaseAdmin
+function getSupabaseAdmin(): SupabaseClient {
+  if (!cachedAdmin) {
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL
+    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+    if (!url || !serviceRoleKey) {
+      throw new Error(
+        "Missing Supabase admin config: set NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY."
+      )
+    }
+    cachedAdmin = createClient(url, serviceRoleKey, { auth: { persistSession: false } })
+  }
+  return cachedAdmin
+}
 
 export async function createSignedUrl(path: string, expires = 60) {
-  const { data, error } = await supabaseAdmin.storage.from("uploads").createSignedUrl(path, expires)
+  const { data, error } = await getSupabaseAdmin().storage.from("uploads").createSignedUrl(path, expires)
   if (error) throw error
   return data.signedUrl
 }
 
+const MAX_DOWNLOAD_BYTES = 5 * 1024 * 1024
+
+const MIME_BY_EXT: Record<string, string> = {
+  png: "image/png",
+  webp: "image/webp",
+  jpg: "image/jpeg",
+  jpeg: "image/jpeg",
+}
+
 export async function downloadFileAsBase64(path: string) {
-  const { data, error } = await supabaseAdmin.storage.from("uploads").download(path)
+  const { data, error } = await getSupabaseAdmin().storage.from("uploads").download(path)
   if (error) throw error
+  if (data.size > MAX_DOWNLOAD_BYTES) return null
   const arrayBuffer = await data.arrayBuffer()
   const base64 = Buffer.from(arrayBuffer).toString("base64")
   // try to infer mimeType from filename
-  const ext = path.split(".").pop() || "jpg"
-  const mimeType = ext === "png" ? "image/png" : "image/jpeg"
+  const ext = (path.split(".").pop() || "jpg").toLowerCase()
+  const mimeType = MIME_BY_EXT[ext] ?? "image/jpeg"
   return { mimeType, data: base64 }
 }

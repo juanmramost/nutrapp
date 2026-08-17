@@ -29,7 +29,10 @@ export default function AuthGate() {
 
   async function handleGoogle() {
     try {
-      const { error } = await supabase.auth.signInWithOAuth({ provider: "google" })
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: "google",
+        options: { redirectTo: window.location.origin },
+      })
       if (error) throw error
     } catch (err: unknown) {
       const text = err instanceof Error ? err.message : "Error al iniciar con Google"
