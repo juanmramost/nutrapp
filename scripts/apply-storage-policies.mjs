@@ -8,7 +8,8 @@ const policies = [
     name: 'upload_own',
     sql: `CREATE POLICY upload_own ON storage.objects
   FOR INSERT WITH CHECK (
-    auth.role() = 'authenticated'
+    bucket_id = 'uploads'
+    AND auth.role() = 'authenticated'
     AND name LIKE ('uploads/' || auth.uid() || '/%')
   );`,
   },
@@ -16,7 +17,8 @@ const policies = [
     name: 'select_own',
     sql: `CREATE POLICY select_own ON storage.objects
   FOR SELECT USING (
-    auth.role() = 'authenticated'
+    bucket_id = 'uploads'
+    AND auth.role() = 'authenticated'
     AND name LIKE ('uploads/' || auth.uid() || '/%')
   );`,
   },
@@ -24,7 +26,8 @@ const policies = [
     name: 'delete_own',
     sql: `CREATE POLICY delete_own ON storage.objects
   FOR DELETE USING (
-    auth.role() = 'authenticated'
+    bucket_id = 'uploads'
+    AND auth.role() = 'authenticated'
     AND name LIKE ('uploads/' || auth.uid() || '/%')
   );`,
   },

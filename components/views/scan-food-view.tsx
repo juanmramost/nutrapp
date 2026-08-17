@@ -87,11 +87,13 @@ export function ScanFoodView({ onSaved }: Props) {
       }
       const resized = await resizeImage(file, 1024, 0.75)
       let res
+      let uploadedPath: string | null = null
       try {
         const ext = resized.type === "image/png" ? "png" : resized.type === "image/webp" ? "webp" : "jpg"
         const path = `uploads/${session.user.id}/${Date.now()}.${ext}`
         const { error: upErr } = await supabase.storage.from("uploads").upload(path, resized, { upsert: true })
         if (upErr) throw upErr
+        uploadedPath = path
         res = await fetch("/api/analyze", {
           method: "POST",
           headers,
@@ -104,6 +106,11 @@ export function ScanFoodView({ onSaved }: Props) {
           headers,
           body: JSON.stringify({ mode: "food", image: part, details: detalles }),
         })
+      } finally {
+        // The photo is only needed while the server analyzes it; don't keep it in Storage
+        if (uploadedPath) {
+          void supabase.storage.from("uploads").remove([uploadedPath]).catch(() => {})
+        }
       }
       const data = await res.json()
       if (!res.ok) throw new Error(data?.error || "Error al analizar la foto")
@@ -154,6 +161,7 @@ export function ScanFoodView({ onSaved }: Props) {
           value={detalles}
           onChange={(e) => setDetalles(e.target.value)}
           placeholder="añade aqui informacion adicional sobre tu plato"
+          maxLength={1000}
           className="h-12"
         />
       </div>

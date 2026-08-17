@@ -1,10 +1,9 @@
 "use client"
 
 import { createContext, useContext, useEffect, useState } from "react"
-import { useRouter } from "next/navigation"
 import supabase from "@/lib/supabaseClient"
 import { migrateLocalToRemote } from "@/lib/supabaseSync"
-import { loadProfile, loadLogs, loadDeficits } from "@/lib/storage"
+import { loadStoredProfile, loadLogs, loadDeficits, clearLocalData } from "@/lib/storage"
 import { User } from "@supabase/supabase-js"
 
 type AuthContextValue = {
@@ -22,7 +21,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [isGuest, setIsGuest] = useState(() => typeof window !== "undefined" && localStorage.getItem("nutrapp:guest") === "1")
   const [ready, setReady] = useState(false)
-  const router = useRouter()
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
@@ -30,20 +28,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setReady(true)
     })
 
-    const { data: sub } = supabase.auth.onAuthStateChange(async (_event, session) => {
+    const { data: sub } = supabase.auth.onAuthStateChange((event, session) => {
       const u = session?.user ?? null
       setUser(u)
-      if (u) {
-        setIsGuest(false)
-        // attempt to migrate local data to remote if present
-        try {
-          const local = { profile: loadProfile(), logs: loadLogs(), deficits: loadDeficits() }
-          await migrateLocalToRemote(u.id, local)
-          // mark migrated for this user
-          if (typeof window !== "undefined") localStorage.setItem(`nutrapp:migrated:${u.id}`, "1")
-        } catch {
-          /* ignore migration errors */
-        }
+      if (!u) return
+      setIsGuest(false)
+      // Migrate local (guest) data to remote only once per user and only on sign-in.
+      // Deferred outside the callback: awaiting supabase calls inside onAuthStateChange can deadlock.
+      if (event === "SIGNED_IN" && localStorage.getItem(`nutrapp:migrated:${u.id}`) !== "1") {
+        setTimeout(() => {
+          const local = { profile: loadStoredProfile() ?? undefined, logs: loadLogs(), deficits: loadDeficits() }
+          void migrateLocalToRemote(u.id, local).then((ok) => {
+            if (ok) localStorage.setItem(`nutrapp:migrated:${u.id}`, "1")
+          })
+        }, 0)
       }
     })
 
@@ -71,11 +69,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } finally {
       clearGuest()
       setUser(null)
-      try {
-        router.push("/")
-      } catch {
-        if (typeof window !== "undefined") window.location.reload()
-      }
+      // Remove this user's data so another account on the same browser never sees or migrates it.
+      clearLocalData()
+      if (typeof window !== "undefined") window.location.replace("/")
     }
   }
 

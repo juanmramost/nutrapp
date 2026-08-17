@@ -32,9 +32,9 @@ async function run() {
 
   console.log('\nRecommended SQL policies to run in Supabase SQL editor:')
   console.log('--------------------------------------------------------------------------------')
-  console.log(`-- Allow authenticated users to upload files to their own folder\nCREATE POLICY upload_own ON storage.objects\n  FOR INSERT WITH CHECK (auth.role() = 'authenticated' AND name LIKE ('uploads/' || auth.uid() || '/%'));\n`)
-  console.log(`-- Allow authenticated users to read their own files\nCREATE POLICY select_own ON storage.objects\n  FOR SELECT USING (auth.role() = 'authenticated' AND name LIKE ('uploads/' || auth.uid() || '/%'));\n`)
-  console.log(`-- Allow authenticated users to delete their own files\nCREATE POLICY delete_own ON storage.objects\n  FOR DELETE USING (auth.role() = 'authenticated' AND name LIKE ('uploads/' || auth.uid() || '/%'));\n`)
+  console.log(`-- Allow authenticated users to upload files to their own folder\nCREATE POLICY upload_own ON storage.objects\n  FOR INSERT WITH CHECK (bucket_id = 'uploads' AND auth.role() = 'authenticated' AND name LIKE ('uploads/' || auth.uid() || '/%'));\n`)
+  console.log(`-- Allow authenticated users to read their own files\nCREATE POLICY select_own ON storage.objects\n  FOR SELECT USING (bucket_id = 'uploads' AND auth.role() = 'authenticated' AND name LIKE ('uploads/' || auth.uid() || '/%'));\n`)
+  console.log(`-- Allow authenticated users to delete their own files\nCREATE POLICY delete_own ON storage.objects\n  FOR DELETE USING (bucket_id = 'uploads' AND auth.role() = 'authenticated' AND name LIKE ('uploads/' || auth.uid() || '/%'));\n`)
   console.log('--------------------------------------------------------------------------------')
   console.log('\nNotes:')
   console.log('- These policies assume client uploads to paths like uploads/{userId}/...')
