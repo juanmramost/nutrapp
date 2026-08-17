@@ -88,7 +88,8 @@ export function ScanFoodView({ onSaved }: Props) {
       const resized = await resizeImage(file, 1024, 0.75)
       let res
       try {
-        const path = `uploads/${session.user.id}/${Date.now()}.jpg`
+        const ext = resized.type === "image/png" ? "png" : resized.type === "image/webp" ? "webp" : "jpg"
+        const path = `uploads/${session.user.id}/${Date.now()}.${ext}`
         const { error: upErr } = await supabase.storage.from("uploads").upload(path, resized, { upsert: true })
         if (upErr) throw upErr
         res = await fetch("/api/analyze", {

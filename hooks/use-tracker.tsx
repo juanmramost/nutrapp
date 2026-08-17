@@ -44,8 +44,19 @@ export function TrackerProvider({ children }: { children: React.ReactNode }) {
   const [profile, setProfileState] = useState<UserProfile>(() => loadProfile())
   const [logs, setLogs] = useState<DailyLogs>(() => loadLogs())
   const [apiKey, setApiKeyState] = useState(() => loadApiKey())
-  const todayKey = useMemo(() => dateKey(), [])
+  const [todayKey, setTodayKey] = useState(() => dateKey())
   const bcRef = useRef<BroadcastChannel | null>(null)
+
+  // Keep todayKey current when the app stays open past midnight
+  useEffect(() => {
+    const id = window.setInterval(() => {
+      setTodayKey((prev) => {
+        const next = dateKey()
+        return next === prev ? prev : next
+      })
+    }, 60_000)
+    return () => window.clearInterval(id)
+  }, [])
 
   useEffect(() => {
     if (typeof BroadcastChannel !== "undefined") {

@@ -17,6 +17,9 @@ function error(message: string, status: number) {
 
 function takeRateLimit(userId: string) {
   const now = Date.now()
+  for (const [key, value] of requestCounts) {
+    if (value.resetAt <= now) requestCounts.delete(key)
+  }
   const current = requestCounts.get(userId)
   if (!current || current.resetAt <= now) {
     requestCounts.set(userId, { count: 1, resetAt: now + 60_000 })

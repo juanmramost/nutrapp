@@ -47,6 +47,13 @@ export function ProfileView() {
   const [draft, setDraft] = useState<UserProfile>(profile)
   const [savedProfile, setSavedProfile] = useState(false)
 
+  // Keep the form in sync when the profile arrives from remote sync
+  const [lastProfile, setLastProfile] = useState(profile)
+  if (lastProfile !== profile) {
+    setLastProfile(profile)
+    setDraft(profile)
+  }
+
   const basalCalculado = calcBasal(draft)
 
   function update<K extends keyof UserProfile>(k: K, v: UserProfile[K]) {
