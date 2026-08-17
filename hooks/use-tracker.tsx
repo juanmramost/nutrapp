@@ -15,6 +15,7 @@ import {
   updateEntry,
   setDeficit,
   removeDeficit,
+  mergeLogs,
 } from "@/lib/storage"
 import { getProfile, getLogs, getDeficits, upsertProfile, upsertLogs, upsertDeficits } from "@/lib/supabaseSync"
 import supabase from "@/lib/supabaseClient"
@@ -70,9 +71,8 @@ export function TrackerProvider({ children }: { children: React.ReactNode }) {
     return () => window.cancelAnimationFrame(readyFrame)
   }, [])
 
-  // When a user logs in, try to load remote data and apply locally
+  // When a user logs in, load remote data and merge it with any local entries
   const { user } = useAuth()
-  const isApplyingRemoteRef = useRef(false)
 
   useEffect(() => {
     async function loadRemote() {
@@ -83,20 +83,32 @@ export function TrackerProvider({ children }: { children: React.ReactNode }) {
           getLogs(user.id),
           getDeficits(user.id),
         ])
-        // apply remote data but avoid echoing back to remote while applying
-        isApplyingRemoteRef.current = true
         if (remoteProfile) {
           setProfileState(remoteProfile)
           try { saveProfile(remoteProfile) } catch {}
         }
-        if (remoteLogs) {
-          setLogs(remoteLogs)
-          try { saveLogs(remoteLogs) } catch {}
-        }
+        // Merge instead of replacing so entries created locally (e.g. while offline
+        // or before a failed upsert) are never silently discarded
+        const merged = mergeLogs(remoteLogs ?? {}, loadLogs())
+        setLogs(merged)
+        try { saveLogs(merged) } catch {}
         if (remoteDeficits) {
-          try { saveDeficits(remoteDeficits) } catch {}
+          try { saveDeficits({ ...loadDeficits(), ...remoteDeficits }) } catch {}
         }
-        isApplyingRemoteRef.current = false
+        // Recompute deficits for merged days and notify views
+        try {
+          const p = remoteProfile ?? loadProfile()
+          const basalNow = p.auto_basal ? calcBasal(p) : p.tdee_basal
+          for (const k of Object.keys(merged)) {
+            setDeficit(k, computeTotals(merged[k] ?? [], basalNow).deficitNeto)
+          }
+          window.dispatchEvent(new CustomEvent("deficits:changed"))
+        } catch {}
+        // Push local-only entries back to remote
+        if (JSON.stringify(merged) !== JSON.stringify(remoteLogs ?? {})) {
+          void upsertLogs(user.id, merged)
+          void upsertDeficits(user.id, loadDeficits())
+        }
       } catch {
         /* ignore remote load errors */
       }
@@ -114,15 +126,10 @@ export function TrackerProvider({ children }: { children: React.ReactNode }) {
         "postgres_changes",
         { event: "*", schema: "public", table: "profiles", filter: `user_id=eq.${user.id}` },
         async () => {
-          try {
-            isApplyingRemoteRef.current = true
-            const remote = await getProfile(user.id)
-            if (remote) {
-              setProfileState(remote)
-              try { saveProfile(remote) } catch {}
-            }
-          } finally {
-            isApplyingRemoteRef.current = false
+          const remote = await getProfile(user.id)
+          if (remote) {
+            setProfileState(remote)
+            try { saveProfile(remote) } catch {}
           }
         },
       )
@@ -134,15 +141,10 @@ export function TrackerProvider({ children }: { children: React.ReactNode }) {
         "postgres_changes",
         { event: "*", schema: "public", table: "logs", filter: `user_id=eq.${user.id}` },
         async () => {
-          try {
-            isApplyingRemoteRef.current = true
-            const remote = await getLogs(user.id)
-            if (remote) {
-              setLogs(remote)
-              try { saveLogs(remote) } catch {}
-            }
-          } finally {
-            isApplyingRemoteRef.current = false
+          const remote = await getLogs(user.id)
+          if (remote) {
+            setLogs(remote)
+            try { saveLogs(remote) } catch {}
           }
         },
       )
@@ -154,14 +156,10 @@ export function TrackerProvider({ children }: { children: React.ReactNode }) {
         "postgres_changes",
         { event: "*", schema: "public", table: "deficits", filter: `user_id=eq.${user.id}` },
         async () => {
-          try {
-            isApplyingRemoteRef.current = true
-            const remote = await getDeficits(user.id)
-            if (remote) {
-              try { saveDeficits(remote) } catch {}
-            }
-          } finally {
-            isApplyingRemoteRef.current = false
+          const remote = await getDeficits(user.id)
+          if (remote) {
+            try { saveDeficits(remote) } catch {}
+            try { window.dispatchEvent(new CustomEvent("deficits:changed")) } catch {}
           }
         },
       )
@@ -187,9 +185,9 @@ export function TrackerProvider({ children }: { children: React.ReactNode }) {
     } catch {
       /* ignore errors */
     }
-    // push to remote if logged in and not applying remote changes
+    // push to remote if logged in
     try {
-      if (user && !isApplyingRemoteRef.current) {
+      if (user) {
         void upsertProfile(user.id, p)
       }
     } catch {}
@@ -228,7 +226,7 @@ export function TrackerProvider({ children }: { children: React.ReactNode }) {
 
       // push logs & deficits to remote if logged in
       try {
-        if (user && !isApplyingRemoteRef.current) {
+        if (user) {
           void upsertLogs(user.id, loadLogs())
           void upsertDeficits(user.id, loadDeficits())
         }
@@ -276,7 +274,7 @@ export function TrackerProvider({ children }: { children: React.ReactNode }) {
         }
         // push logs & deficits to remote
         try {
-          if (user && !isApplyingRemoteRef.current) {
+          if (user) {
             void upsertLogs(user.id, next)
             void upsertDeficits(user.id, loadDeficits())
           }
@@ -309,7 +307,7 @@ export function TrackerProvider({ children }: { children: React.ReactNode }) {
           /* ignore */
         }
         try {
-          if (user && !isApplyingRemoteRef.current) {
+          if (user) {
             void upsertLogs(user.id, next)
             void upsertDeficits(user.id, loadDeficits())
           }
@@ -342,7 +340,7 @@ export function TrackerProvider({ children }: { children: React.ReactNode }) {
           /* ignore */
         }
         try {
-          if (user && !isApplyingRemoteRef.current) {
+          if (user) {
             void upsertLogs(user.id, next)
             void upsertDeficits(user.id, loadDeficits())
           }
