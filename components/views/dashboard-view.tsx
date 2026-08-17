@@ -1,7 +1,7 @@
 "use client"
 
 import { motion } from "motion/react"
-import { Activity, Flame, Moon, Trash2, UtensilsCrossed } from "lucide-react"
+import { Activity, CloudOff, Flame, Moon, Trash2, UtensilsCrossed } from "lucide-react"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { CalorieRing } from "@/components/calorie-ring"
@@ -60,7 +60,7 @@ function StatCard({
 }
 
 export function DashboardView() {
-  const { totals, todayEntries, removeToday, profile } = useTracker()
+  const { totals, todayEntries, removeToday, profile, syncError } = useTracker()
   const { user, isGuest } = useAuth()
 
   function handleRemove(id: string) {
@@ -87,6 +87,13 @@ export function DashboardView() {
         <p className="text-sm capitalize text-muted-foreground">{today}</p>
         <h1 className="text-2xl font-bold tracking-tight">{displayTitle}</h1>
       </header>
+
+      {user && syncError && (
+        <div className="flex items-center gap-2 rounded-xl border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-500">
+          <CloudOff className="size-4 shrink-0" />
+          <span>Algunos cambios no se han podido sincronizar. Se guardaron en este dispositivo y se reintentará automáticamente.</span>
+        </div>
+      )}
 
       <Card className="items-center gap-5 p-6">
         <CalorieRing totals={totals} />

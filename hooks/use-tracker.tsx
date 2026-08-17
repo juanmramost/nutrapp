@@ -5,11 +5,9 @@ import type { DailyLogs, LogEntry, UserProfile } from "@/lib/types"
 import {
   addEntry,
   dateKey,
-  loadApiKey,
   loadLogs,
   loadProfile,
   removeEntry,
-  saveApiKey,
   saveLogs,
   saveProfile,
   updateEntry,
@@ -26,12 +24,12 @@ import { calcBasal, computeTotals, type DayTotals } from "@/lib/nutrition"
 interface TrackerContextValue {
   ready: boolean
   profile: UserProfile
-  apiKey: string
   todayKey: string
   todayEntries: LogEntry[]
   totals: DayTotals
+  /** true si la última escritura remota falló (los datos siguen guardados en local) */
+  syncError: boolean
   setProfile: (p: UserProfile) => void
-  setApiKey: (k: string) => void
   addToday: (entry: LogEntry) => void
   removeToday: (id: string) => void
   removeDay: (dateKey: string) => void
@@ -44,9 +42,13 @@ export function TrackerProvider({ children }: { children: React.ReactNode }) {
   const [ready, setReady] = useState(false)
   const [profile, setProfileState] = useState<UserProfile>(() => loadProfile())
   const [logs, setLogs] = useState<DailyLogs>(() => loadLogs())
-  const [apiKey, setApiKeyState] = useState(() => loadApiKey())
   const [todayKey, setTodayKey] = useState(() => dateKey())
+  const [syncError, setSyncError] = useState(false)
   const bcRef = useRef<BroadcastChannel | null>(null)
+
+  const trackSync = useCallback((...ops: Promise<boolean>[]) => {
+    void Promise.all(ops).then((results) => setSyncError(results.some((ok) => !ok)))
+  }, [])
 
   // Keep todayKey current when the app stays open past midnight
   useEffect(() => {
@@ -106,15 +108,14 @@ export function TrackerProvider({ children }: { children: React.ReactNode }) {
         } catch {}
         // Push local-only entries back to remote
         if (JSON.stringify(merged) !== JSON.stringify(remoteLogs ?? {})) {
-          void upsertLogs(user.id, merged)
-          void upsertDeficits(user.id, loadDeficits())
+          trackSync(upsertLogs(user.id, merged), upsertDeficits(user.id, loadDeficits()))
         }
       } catch {
         /* ignore remote load errors */
       }
     }
     loadRemote()
-  }, [user])
+  }, [user, trackSync])
 
   // Subscribe to remote changes for real-time sync (supabase-js v2 channels)
   useEffect(() => {
@@ -143,8 +144,10 @@ export function TrackerProvider({ children }: { children: React.ReactNode }) {
         async () => {
           const remote = await getLogs(user.id)
           if (remote) {
-            setLogs(remote)
-            try { saveLogs(remote) } catch {}
+            // Merge with local so a write racing with this event is not clobbered
+            const merged = mergeLogs(remote, loadLogs())
+            setLogs(merged)
+            try { saveLogs(merged) } catch {}
           }
         },
       )
@@ -188,15 +191,10 @@ export function TrackerProvider({ children }: { children: React.ReactNode }) {
     // push to remote if logged in
     try {
       if (user) {
-        void upsertProfile(user.id, p)
+        trackSync(upsertProfile(user.id, p))
       }
     } catch {}
-  }, [todayKey, user])
-
-  const setApiKey = useCallback((k: string) => {
-    setApiKeyState(k)
-    saveApiKey(k)
-  }, [])
+  }, [todayKey, user, trackSync])
 
   const todayEntries = useMemo(() => logs[todayKey] ?? [], [logs, todayKey])
 
@@ -227,8 +225,7 @@ export function TrackerProvider({ children }: { children: React.ReactNode }) {
       // push logs & deficits to remote if logged in
       try {
         if (user) {
-          void upsertLogs(user.id, loadLogs())
-          void upsertDeficits(user.id, loadDeficits())
+          trackSync(upsertLogs(user.id, loadLogs()), upsertDeficits(user.id, loadDeficits()))
         }
       } catch {}
 
@@ -248,7 +245,7 @@ export function TrackerProvider({ children }: { children: React.ReactNode }) {
         } catch {}
       }
     },
-    [user],
+    [user, trackSync],
   )
 
   const addToday = useCallback(
@@ -275,14 +272,13 @@ export function TrackerProvider({ children }: { children: React.ReactNode }) {
         // push logs & deficits to remote
         try {
           if (user) {
-            void upsertLogs(user.id, next)
-            void upsertDeficits(user.id, loadDeficits())
+            trackSync(upsertLogs(user.id, next), upsertDeficits(user.id, loadDeficits()))
           }
         } catch {}
         return next
       })
     },
-    [todayKey, basal, user],
+    [todayKey, basal, user, trackSync],
   )
 
   const removeToday = useCallback(
@@ -308,14 +304,13 @@ export function TrackerProvider({ children }: { children: React.ReactNode }) {
         }
         try {
           if (user) {
-            void upsertLogs(user.id, next)
-            void upsertDeficits(user.id, loadDeficits())
+            trackSync(upsertLogs(user.id, next), upsertDeficits(user.id, loadDeficits()))
           }
         } catch {}
         return next
       })
     },
-    [todayKey, basal, user],
+    [todayKey, basal, user, trackSync],
   )
 
   const updateToday = useCallback(
@@ -341,14 +336,13 @@ export function TrackerProvider({ children }: { children: React.ReactNode }) {
         }
         try {
           if (user) {
-            void upsertLogs(user.id, next)
-            void upsertDeficits(user.id, loadDeficits())
+            trackSync(upsertLogs(user.id, next), upsertDeficits(user.id, loadDeficits()))
           }
         } catch {}
         return next
       })
     },
-    [todayKey, basal, user],
+    [todayKey, basal, user, trackSync],
   )
 
   // Listen for external sync messages (BroadcastChannel or storage events)
@@ -396,12 +390,11 @@ export function TrackerProvider({ children }: { children: React.ReactNode }) {
   const value: TrackerContextValue = {
     ready,
     profile,
-    apiKey,
     todayKey,
     todayEntries,
     totals,
+    syncError,
     setProfile,
-    setApiKey,
     addToday,
     removeToday,
     removeDay,

@@ -2,6 +2,7 @@ import type { FoodAnalysis, WorkoutAnalysis } from "./types"
  
 const MODEL = "gemini-3.5-flash"
 const ENDPOINT = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent`
+const GEMINI_TIMEOUT_MS = 30_000
  
 export interface ImagePart {
   mimeType: string
@@ -82,28 +83,38 @@ async function generateJson<T>(opts: GenerateOptions): Promise<T> {
     throw new Error("Falta la API Key de Gemini. Configúrala en Ajustes.")
   }
  
-  const res = await fetch(`${ENDPOINT}?key=${encodeURIComponent(opts.apiKey)}`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      systemInstruction: { parts: [{ text: opts.systemInstruction }] },
-      contents: [
-        {
-          role: "user",
-          parts: [
-            { text: opts.prompt },
-            { inlineData: { mimeType: opts.image.mimeType, data: opts.image.data } },
-          ],
+  let res: Response
+  try {
+    res = await fetch(ENDPOINT, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-goog-api-key": opts.apiKey },
+      signal: AbortSignal.timeout(GEMINI_TIMEOUT_MS),
+      body: JSON.stringify({
+        systemInstruction: { parts: [{ text: opts.systemInstruction }] },
+        contents: [
+          {
+            role: "user",
+            parts: [
+              { text: opts.prompt },
+              { inlineData: { mimeType: opts.image.mimeType, data: opts.image.data } },
+            ],
+          },
+        ],
+        generationConfig: {
+          responseMimeType: "application/json",
+          responseSchema: opts.responseSchema,
+          temperature: 0.2,
         },
-      ],
-      generationConfig: {
-        responseMimeType: "application/json",
-        responseSchema: opts.responseSchema,
-        temperature: 0.2,
-      },
-    }),
-  })
- 
+      }),
+    })
+  } catch (err) {
+    const name = err && typeof err === "object" && "name" in err ? (err as { name?: string }).name : undefined
+    if (name === "TimeoutError" || name === "AbortError") {
+      throw new Error("La IA tardó demasiado en responder. Inténtalo de nuevo.")
+    }
+    throw err
+  }
+
   if (!res.ok) {
     let detail = ""
     try {

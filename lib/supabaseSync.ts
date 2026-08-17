@@ -11,11 +11,13 @@ export async function getProfile(userId: string): Promise<UserProfile | null> {
   return (data?.data as UserProfile) ?? null
 }
 
-export async function upsertProfile(userId: string, profile: UserProfile) {
+export async function upsertProfile(userId: string, profile: UserProfile): Promise<boolean> {
   const { error } = await supabase.from("profiles").upsert({ user_id: userId, data: profile })
   if (error) {
     console.error("supabase:upsertProfile error", { userId, error })
+    return false
   }
+  return true
 }
 
 export async function getLogs(userId: string): Promise<DailyLogs | null> {
@@ -27,11 +29,13 @@ export async function getLogs(userId: string): Promise<DailyLogs | null> {
   return (data?.data as DailyLogs) ?? null
 }
 
-export async function upsertLogs(userId: string, logs: DailyLogs) {
+export async function upsertLogs(userId: string, logs: DailyLogs): Promise<boolean> {
   const { error } = await supabase.from("logs").upsert({ user_id: userId, data: logs })
   if (error) {
     console.error("supabase:upsertLogs error", { userId, error })
+    return false
   }
+  return true
 }
 
 export async function getDeficits(userId: string): Promise<Record<string, number> | null> {
@@ -43,11 +47,13 @@ export async function getDeficits(userId: string): Promise<Record<string, number
   return (data?.data as Record<string, number>) ?? null
 }
 
-export async function upsertDeficits(userId: string, deficits: Record<string, number>) {
+export async function upsertDeficits(userId: string, deficits: Record<string, number>): Promise<boolean> {
   const { error } = await supabase.from("deficits").upsert({ user_id: userId, data: deficits })
   if (error) {
     console.error("supabase:upsertDeficits error", { userId, error })
+    return false
   }
+  return true
 }
 
 // Migrate local storage data to Supabase if remote is empty. Returns true if migrated or nothing to do.
