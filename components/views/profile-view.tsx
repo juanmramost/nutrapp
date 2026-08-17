@@ -61,10 +61,21 @@ export function ProfileView() {
     setSavedProfile(false)
   }
 
+  function clamp(v: number, min: number, max: number) {
+    if (!Number.isFinite(v)) return min
+    return Math.min(max, Math.max(min, v))
+  }
+
   function handleSaveProfile() {
-    const next: UserProfile = {
+    const sane: UserProfile = {
       ...draft,
-      tdee_basal: draft.auto_basal ? basalCalculado : draft.tdee_basal,
+      peso_kg: clamp(draft.peso_kg, 20, 400),
+      altura_cm: clamp(draft.altura_cm, 80, 250),
+      edad: clamp(draft.edad, 5, 120),
+    }
+    const next: UserProfile = {
+      ...sane,
+      tdee_basal: sane.auto_basal ? calcBasal(sane) : clamp(sane.tdee_basal, 500, 10000),
     }
     setProfile(next)
     setDraft(next)

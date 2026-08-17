@@ -138,7 +138,7 @@ export function ProgresoView() {
         </div>
         <div className="mt-4 flex gap-2">
           <Button variant="secondary" onClick={handleBulkDelete} className="w-full">
-            Eliminar últimos 7 registros
+            Eliminar últimos 7 días
           </Button>
         </div>
       </Card>

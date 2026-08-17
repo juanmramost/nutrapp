@@ -2,7 +2,6 @@ import type { DailyLogs, LogEntry, UserProfile } from "./types"
 
 const PROFILE_KEY = "user_profile"
 const LOGS_KEY = "daily_logs"
-const API_KEY_KEY = "gemini_api_key"
 
 export const DEFAULT_PROFILE: UserProfile = {
   peso_kg: 75,
@@ -78,16 +77,6 @@ export function updateEntry(logs: DailyLogs, key: string, entry: LogEntry): Dail
   return { ...logs, [key]: logs[key].map((e) => (e.id === entry.id ? entry : e)) }
 }
 
-export function loadApiKey(): string {
-  if (!isBrowser()) return ""
-  return localStorage.getItem(API_KEY_KEY) || process.env.NEXT_PUBLIC_GEMINI_API_KEY || ""
-}
-
-export function saveApiKey(key: string) {
-  if (!isBrowser()) return
-  localStorage.setItem(API_KEY_KEY, key.trim())
-}
-
 const DEFICITS_KEY = "daily_deficits"
 
 export function loadDeficits(): Record<string, number> {
@@ -137,6 +126,8 @@ export function clearLocalData() {
   localStorage.removeItem(PROFILE_KEY)
   localStorage.removeItem(LOGS_KEY)
   localStorage.removeItem(DEFICITS_KEY)
+  // Legacy: client-side Gemini key from older versions
+  localStorage.removeItem("gemini_api_key")
 }
 
 /**
