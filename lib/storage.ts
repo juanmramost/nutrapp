@@ -9,6 +9,7 @@ export const DEFAULT_PROFILE: UserProfile = {
   altura_cm: 175,
   edad: 30,
   genero: "hombre",
+  objetivo: "mantener",
   tdee_basal: 1700,
   auto_basal: true,
 }

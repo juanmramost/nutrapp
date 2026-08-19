@@ -28,7 +28,10 @@ export function fileToImagePart(file: File): Promise<ImagePart> {
  * Devuelve un nuevo `File` en formato `image/jpeg`.
  */
 export async function resizeImage(file: File, maxDim = 1024, quality = 0.75): Promise<File> {
-  if (!file.type.startsWith("image/")) return file
+  if (!file.type.startsWith("image/")) throw new Error("Selecciona una imagen válida")
+  if (!new Set(["image/jpeg", "image/png", "image/webp"]).has(file.type)) {
+    throw new Error("Este formato no es compatible. Usa una foto JPG, PNG o WebP.")
+  }
 
   const img = await new Promise<HTMLImageElement>((resolve, reject) => {
     const url = URL.createObjectURL(file)
@@ -39,7 +42,7 @@ export async function resizeImage(file: File, maxDim = 1024, quality = 0.75): Pr
     }
     i.onerror = () => {
       URL.revokeObjectURL(url)
-      reject(new Error("No se pudo cargar la imagen para redimensionar"))
+      reject(new Error("No se pudo abrir la foto. Prueba con otra imagen JPG, PNG o WebP."))
     }
     i.src = url
   })

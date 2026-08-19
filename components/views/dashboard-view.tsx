@@ -5,6 +5,7 @@ import { Activity, Flame, Moon, Trash2, UtensilsCrossed } from "lucide-react"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { CalorieRing } from "@/components/calorie-ring"
+import { Recommendations } from "@/components/recommendations"
 import { useTracker } from "@/hooks/use-tracker"
 import { useAuth } from "@/hooks/use-auth"
 import { isMeal } from "@/lib/nutrition"
@@ -139,6 +140,8 @@ export function DashboardView() {
         <MacroBar label="Carbohidratos" value={totals.carbohidratos} max={300} color="var(--food)" />
         <MacroBar label="Grasas" value={totals.grasas} max={80} color="var(--exercise)" />
       </Card>
+
+      <Recommendations />
 
       <section className="flex flex-col gap-3">
         <h2 className="text-sm font-semibold">Registro del día</h2>

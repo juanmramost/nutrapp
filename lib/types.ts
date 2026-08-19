@@ -1,10 +1,24 @@
 export type Genero = "hombre" | "mujer"
 
+export type Objetivo =
+  | "perder_peso"
+  | "ganar_musculo"
+  | "mantener"
+  | "mejorar_salud"
+
+export type RecommendationTone = "positivo" | "ajuste_leve" | "atencion"
+
 export interface UserProfile {
   peso_kg: number
   altura_cm: number
   edad: number
   genero: Genero
+  objetivo: Objetivo
+  /**
+   * IMC indicado manualmente por el usuario. Si falta o no es válido,
+   * se calcula automáticamente a partir de peso_kg y altura_cm.
+   */
+  imc?: number
   /** Calorías basales/reposo diarias (TDEE en reposo). Puede calcularse o ajustarse a mano. */
   tdee_basal: number
   /** Si true, tdee_basal se recalcula automáticamente con Mifflin-St Jeor. */
@@ -51,4 +65,11 @@ export interface FoodAnalysis {
 export interface WorkoutAnalysis {
   tipo_actividad: string
   calorias_activas: number
+}
+
+export interface DailyRecommendation {
+  fecha: string
+  texto: string
+  tono: RecommendationTone
+  created_at: string
 }

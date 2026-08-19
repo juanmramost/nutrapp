@@ -9,7 +9,8 @@ import { Label } from "@/components/ui/label"
 import { useTracker } from "@/hooks/use-tracker"
 import { useAuth } from "@/hooks/use-auth"
 import { calcBasal } from "@/lib/nutrition"
-import type { Genero, UserProfile } from "@/lib/types"
+import { calculateImc, getProfileImc, getImcCategory } from "@/lib/profile"
+import type { Genero, Objetivo, UserProfile } from "@/lib/types"
 
 function Field({
   label,
@@ -41,6 +42,13 @@ function Field({
   )
 }
 
+const OBJETIVOS: { value: Objetivo; label: string }[] = [
+  { value: "perder_peso", label: "Perder peso" },
+  { value: "ganar_musculo", label: "Ganar músculo" },
+  { value: "mantener", label: "Mantener" },
+  { value: "mejorar_salud", label: "Mejorar salud" },
+]
+
 export function ProfileView() {
   const { profile, setProfile } = useTracker()
   const { user, isGuest, signOut, clearGuest } = useAuth()
@@ -48,6 +56,9 @@ export function ProfileView() {
   const [savedProfile, setSavedProfile] = useState(false)
 
   const basalCalculado = calcBasal(draft)
+  const autoImc = calculateImc(draft.peso_kg, draft.altura_cm)
+  const imcActual = getProfileImc(draft)
+  const imcCategoria = getImcCategory(imcActual)
 
   function update<K extends keyof UserProfile>(k: K, v: UserProfile[K]) {
     setDraft((d) => ({ ...d, [k]: v }))
@@ -63,8 +74,6 @@ export function ProfileView() {
     setDraft(next)
     setSavedProfile(true)
   }
-
-
 
   return (
     <div className="flex flex-col gap-5 px-4 pb-4 pt-8">
@@ -100,6 +109,54 @@ export function ProfileView() {
           <Field label="Peso" value={draft.peso_kg} suffix="kg" onChange={(v) => update("peso_kg", v)} />
           <Field label="Altura" value={draft.altura_cm} suffix="cm" onChange={(v) => update("altura_cm", v)} />
           <Field label="Edad" value={draft.edad} suffix="años" onChange={(v) => update("edad", v)} />
+        </div>
+
+        <div className="flex flex-col gap-1.5">
+          <div className="flex items-center justify-between">
+            <Label className="text-xs text-muted-foreground">IMC (opcional)</Label>
+            {imcCategoria && (
+              <span className="text-xs font-medium text-muted-foreground">{imcCategoria}</span>
+            )}
+          </div>
+          <Input
+            type="number"
+            inputMode="decimal"
+            placeholder={autoImc !== null ? String(autoImc) : "—"}
+            value={draft.imc ?? ""}
+            onChange={(e) => {
+              const raw = e.target.value
+              if (raw === "") {
+                update("imc", undefined as unknown as number)
+                return
+              }
+              update("imc", Number(raw))
+            }}
+            className="h-12 tabular-nums"
+          />
+          <p className="text-xs text-muted-foreground">
+            Calculado automáticamente a partir de tu peso y altura. Puedes sobrescribirlo si te lo has medido
+            con otro método (ej. báscula de bioimpedancia).
+          </p>
+        </div>
+
+        <div className="flex flex-col gap-1.5">
+          <Label className="text-xs text-muted-foreground">Objetivo</Label>
+          <div className="grid grid-cols-2 gap-2">
+            {OBJETIVOS.map((o) => (
+              <button
+                key={o.value}
+                type="button"
+                onClick={() => update("objetivo", o.value)}
+                className={`h-11 rounded-xl text-sm font-medium transition-colors ${
+                  draft.objetivo === o.value
+                    ? "bg-primary text-primary-foreground"
+                    : "bg-muted text-muted-foreground"
+                }`}
+              >
+                {o.label}
+              </button>
+            ))}
+          </div>
         </div>
       </Card>
 
@@ -163,8 +220,6 @@ export function ProfileView() {
           </a>
         )}
       </div>
-
-      
 
       <p className="pb-2 text-center text-xs text-muted-foreground">
         Déficit · Tracker con IA de Gemini
