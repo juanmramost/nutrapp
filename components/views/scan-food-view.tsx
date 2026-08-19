@@ -7,6 +7,7 @@ import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { ImagePicker } from "@/components/image-picker"
 import { useTracker } from "@/hooks/use-tracker"
 import { fileToImagePart, resizeImage } from "@/lib/gemini"
@@ -50,20 +51,33 @@ function NumberField({
 
 export function ScanFoodView({ onSaved }: Props) {
   const { addToday } = useTracker()
+
+  // Foto (IA por imagen)
   const [file, setFile] = useState<File | null>(null)
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
+  const [detalles, setDetalles] = useState<string>("")
+
+  // Manual (IA por texto)
+  const [description, setDescription] = useState<string>("")
+
+  // Compartido entre ambos flujos
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [result, setResult] = useState<FoodAnalysis | null>(null)
-  const [detalles, setDetalles] = useState<string>("")
+  const [savedDetails, setSavedDetails] = useState<string | undefined>(undefined)
 
-  function reset() {
+  function resetPhoto() {
     setFile(null)
     if (previewUrl) URL.revokeObjectURL(previewUrl)
     setPreviewUrl(null)
+  }
+
+  function resetAll() {
+    resetPhoto()
+    setDescription("")
     setResult(null)
     setError(null)
-    setDetalles("")
+    setSavedDetails(undefined)
   }
 
   function handleSelect(f: File) {
@@ -73,18 +87,24 @@ export function ScanFoodView({ onSaved }: Props) {
     setPreviewUrl(URL.createObjectURL(f))
   }
 
-  async function handleAnalyze() {
+  async function getAuthHeaders() {
+    const { data: sessionData } = await supabase.auth.getSession()
+    const session = sessionData.session
+    if (!session) throw new Error("Inicia sesión para usar el análisis con IA")
+    return {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${session.access_token}`,
+    }
+  }
+
+  async function handleAnalyzePhoto() {
     if (!file) return
     setLoading(true)
     setError(null)
     try {
+      const headers = await getAuthHeaders()
       const { data: sessionData } = await supabase.auth.getSession()
-      const session = sessionData.session
-      if (!session) throw new Error("Inicia sesión para usar el análisis con IA")
-      const headers = {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${session.access_token}`,
-      }
+      const session = sessionData.session!
       const resized = await resizeImage(file, 1024, 0.75)
       let res
       try {
@@ -107,8 +127,31 @@ export function ScanFoodView({ onSaved }: Props) {
       const data = await res.json()
       if (!res.ok) throw new Error(data?.error || "Error al analizar la foto")
       setResult(data as FoodAnalysis)
+      setSavedDetails(detalles || undefined)
     } catch (e) {
       setError(e instanceof Error ? e.message : "Error al analizar la foto")
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  async function handleAnalyzeText() {
+    if (!description.trim()) return
+    setLoading(true)
+    setError(null)
+    try {
+      const headers = await getAuthHeaders()
+      const res = await fetch("/api/analyze", {
+        method: "POST",
+        headers,
+        body: JSON.stringify({ mode: "food_text", description: description.trim() }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data?.error || "Error al analizar la descripción")
+      setResult(data as FoodAnalysis)
+      setSavedDetails(description.trim())
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Error al analizar la descripción")
     } finally {
       setLoading(false)
     }
@@ -125,48 +168,93 @@ export function ScanFoodView({ onSaved }: Props) {
       carbohidratos_g: Math.round(result.carbohidratos_g),
       grasas_g: Math.round(result.grasas_g),
       ingredientes: result.ingredientes,
-      detalles: detalles || undefined,
+      detalles: savedDetails,
       confianza: result.confianza_estimacion,
       createdAt: Date.now(),
     })
-    reset()
+    resetAll()
     onSaved()
   }
 
   return (
     <div className="flex flex-col gap-5 px-4 pb-4 pt-8">
       <header>
-        <h1 className="text-2xl font-bold tracking-tight">Escanear comida</h1>
-        <p className="text-sm text-muted-foreground">Fotografía tu plato y deja que la IA calcule las calorías</p>
+        <h1 className="text-2xl font-bold tracking-tight">Registrar comida</h1>
+        <p className="text-sm text-muted-foreground">Fotografía tu plato o descríbelo y deja que la IA calcule las calorías</p>
       </header>
 
-      <ImagePicker
-        previewUrl={previewUrl}
-        onSelect={handleSelect}
-        onClear={reset}
-        accentColor="var(--food)"
-      />
+      <Tabs
+        defaultValue="foto"
+        className="gap-5"
+        onValueChange={() => {
+          setResult(null)
+          setError(null)
+        }}
+      >
+        <TabsList className="w-full">
+          <TabsTrigger value="foto">Foto</TabsTrigger>
+          <TabsTrigger value="manual">Manual</TabsTrigger>
+        </TabsList>
 
-      <div className="flex flex-col gap-1.5 mt-3">
-        <Label className="text-xs text-muted-foreground">Detalles (opcional)</Label>
-        <Input
-          value={detalles}
-          onChange={(e) => setDetalles(e.target.value)}
-          placeholder="añade aqui informacion adicional sobre tu plato"
-          className="h-12"
-        />
-      </div>
+        <TabsContent value="foto" className="flex flex-col gap-5">
+          <ImagePicker
+            previewUrl={previewUrl}
+            onSelect={handleSelect}
+            onClear={resetPhoto}
+            accentColor="var(--food)"
+          />
 
-      {file && !result && (
-        <Button
-          className="h-12 w-full gap-2 bg-food text-food-foreground hover:bg-food/90"
-          onClick={handleAnalyze}
-          disabled={loading}
-        >
-          {loading ? <Loader2 className="size-4 animate-spin" /> : <Sparkles className="size-4" />}
-          {loading ? "Analizando plato..." : "Analizar Plato con IA"}
-        </Button>
-      )}
+          <div className="flex flex-col gap-1.5">
+            <Label className="text-xs text-muted-foreground">Detalles (opcional)</Label>
+            <Input
+              value={detalles}
+              onChange={(e) => setDetalles(e.target.value)}
+              placeholder="añade aquí información adicional sobre tu plato"
+              className="h-12"
+            />
+          </div>
+
+          {file && !result && (
+            <Button
+              className="h-12 w-full gap-2 bg-food text-food-foreground hover:bg-food/90"
+              onClick={handleAnalyzePhoto}
+              disabled={loading}
+            >
+              {loading ? <Loader2 className="size-4 animate-spin" /> : <Sparkles className="size-4" />}
+              {loading ? "Analizando plato..." : "Analizar Plato con IA"}
+            </Button>
+          )}
+        </TabsContent>
+
+        <TabsContent value="manual" className="flex flex-col gap-5">
+          <Card className="gap-4 px-4">
+            <div className="flex flex-col gap-1.5">
+              <Label className="text-xs text-muted-foreground">Describe tu comida</Label>
+              <textarea
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                placeholder="Ej: comí arroz con pollo, 150g de pechuga y 100g de arroz blanco cocido"
+                rows={4}
+                className="w-full resize-none rounded-xl border border-input bg-transparent px-3 py-2.5 text-sm outline-none placeholder:text-muted-foreground focus:ring-2 focus:ring-ring"
+              />
+              <p className="text-xs text-muted-foreground">
+                Cuanto más específico seas con las cantidades (gramos, unidades), más precisa será la estimación.
+              </p>
+            </div>
+
+            {!result && (
+              <Button
+                className="h-12 w-full gap-2 bg-food text-food-foreground hover:bg-food/90 disabled:opacity-50"
+                onClick={handleAnalyzeText}
+                disabled={loading || !description.trim()}
+              >
+                {loading ? <Loader2 className="size-4 animate-spin" /> : <Sparkles className="size-4" />}
+                {loading ? "Analizando..." : "Analizar con IA"}
+              </Button>
+            )}
+          </Card>
+        </TabsContent>
+      </Tabs>
 
       {error && (
         <Card className="gap-2 border-destructive/40 px-4 text-sm ring-destructive/40">
@@ -203,8 +291,6 @@ export function ScanFoodView({ onSaved }: Props) {
                 className="h-12"
               />
             </div>
-
-            {/* detalles input shown above the picker */}
 
             <NumberField
               label="Calorías totales"

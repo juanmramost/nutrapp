@@ -22,7 +22,7 @@ interface Props {
 export function WorkoutView({ onSaved }: Props) {
   const { addToday } = useTracker()
 
-  // Captura (IA)
+  // Captura (IA por imagen)
   const [file, setFile] = useState<File | null>(null)
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
@@ -32,6 +32,11 @@ export function WorkoutView({ onSaved }: Props) {
   // Manual
   const [tipo, setTipo] = useState("")
   const [kcal, setKcal] = useState("")
+
+  // Manual con IA (por texto)
+  const [description, setDescription] = useState("")
+  const [aiLoading, setAiLoading] = useState(false)
+  const [aiError, setAiError] = useState<string | null>(null)
 
   function resetCapture() {
     setFile(null)
@@ -76,6 +81,34 @@ export function WorkoutView({ onSaved }: Props) {
     }
   }
 
+  async function handleAnalyzeDescription() {
+    if (!description.trim()) return
+    setAiLoading(true)
+    setAiError(null)
+    try {
+      const { data: sessionData } = await supabase.auth.getSession()
+      const session = sessionData.session
+      if (!session) throw new Error("Inicia sesión para usar el análisis con IA")
+      const res = await fetch("/api/analyze", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({ mode: "workout_text", description: description.trim() }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data?.error || "Error al analizar la descripción")
+      const analysis = data as WorkoutAnalysis
+      setTipo(analysis.tipo_actividad)
+      setKcal(String(Math.round(analysis.calorias_activas)))
+    } catch (e) {
+      setAiError(e instanceof Error ? e.message : "Error al analizar la descripción")
+    } finally {
+      setAiLoading(false)
+    }
+  }
+
   function saveWorkout(tipo_actividad: string, calorias_activas: number) {
     addToday({
       id: newId(),
@@ -87,6 +120,8 @@ export function WorkoutView({ onSaved }: Props) {
     resetCapture()
     setTipo("")
     setKcal("")
+    setDescription("")
+    setAiError(null)
     onSaved()
   }
 
@@ -96,7 +131,7 @@ export function WorkoutView({ onSaved }: Props) {
     <div className="flex flex-col gap-5 px-4 pb-4 pt-8">
       <header>
         <h1 className="text-2xl font-bold tracking-tight">Registrar entreno</h1>
-        <p className="text-sm text-muted-foreground">Sube una captura de tu reloj o introduce los datos a mano</p>
+        <p className="text-sm text-muted-foreground">Sube una captura de tu reloj, describe tu entreno o introduce los datos a mano</p>
       </header>
 
       <Tabs defaultValue="captura" className="gap-5">
@@ -175,6 +210,32 @@ export function WorkoutView({ onSaved }: Props) {
 
         <TabsContent value="manual" className="flex flex-col gap-5">
           <Card className="gap-4 px-4">
+            <div className="flex flex-col gap-1.5">
+              <Label className="text-xs text-muted-foreground">Describe tu entrenamiento (opcional)</Label>
+              <textarea
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                placeholder="Ej: 30 min de pecho, 4 series de press banca y aperturas"
+                rows={3}
+                className="w-full resize-none rounded-xl border border-input bg-transparent px-3 py-2.5 text-sm outline-none placeholder:text-muted-foreground focus:ring-2 focus:ring-ring"
+              />
+              <Button
+                variant="outline"
+                className="h-11 w-full gap-2 disabled:opacity-50"
+                onClick={handleAnalyzeDescription}
+                disabled={aiLoading || !description.trim()}
+              >
+                {aiLoading ? <Loader2 className="size-4 animate-spin" /> : <Sparkles className="size-4" />}
+                {aiLoading ? "Estimando..." : "Estimar con IA"}
+              </Button>
+              {aiError && (
+                <p className="text-xs text-destructive">{aiError}</p>
+              )}
+              <p className="text-xs text-muted-foreground">
+                La IA rellenará el tipo de actividad y las calorías abajo. Puedes revisarlas y ajustarlas antes de guardar.
+              </p>
+            </div>
+
             <div className="flex flex-col gap-1.5">
               <Label className="text-xs text-muted-foreground">Tipo de actividad</Label>
               <Input

@@ -1,16 +1,18 @@
 import { NextResponse } from "next/server"
 import { createClient } from "@supabase/supabase-js"
-import { analyzeFood, analyzeWorkout } from "@/lib/gemini"
+import { analyzeFood, analyzeFoodText, analyzeWorkout, analyzeWorkoutText } from "@/lib/gemini"
 import { downloadFileAsBase64 } from "@/lib/supabaseAdmin"
 
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024
 const MAX_DETAILS_LENGTH = 1_000
+const MAX_DESCRIPTION_LENGTH = 1_000
 const MAX_REQUESTS_PER_MINUTE = 10
 const RETRY_DELAYS_MS = [300, 900]
 const ALLOWED_MIME_TYPES = new Set(["image/jpeg", "image/png", "image/webp"])
 const requestCounts = new Map<string, { count: number; resetAt: number }>()
 
 type ImagePart = { mimeType: string; data: string }
+type Mode = "food" | "workout" | "food_text" | "workout_text"
 
 function error(message: string, status: number) {
   return NextResponse.json({ error: message }, { status })
@@ -66,6 +68,24 @@ async function retry<T>(operation: "storage" | "gemini", fn: () => Promise<T>): 
   throw lastError
 }
 
+function getAdminClient() {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+  if (!supabaseUrl || !serviceKey) throw new Error("Supabase admin no configurado")
+  return createClient(supabaseUrl, serviceKey, { auth: { persistSession: false } })
+}
+
+async function getUserPesoKg(userId: string): Promise<number | undefined> {
+  try {
+    const admin = getAdminClient()
+    const { data } = await admin.from("profiles").select("data").eq("user_id", userId).maybeSingle()
+    const peso = (data?.data as { peso_kg?: number } | undefined)?.peso_kg
+    return typeof peso === "number" && Number.isFinite(peso) && peso > 0 ? peso : undefined
+  } catch {
+    return undefined
+  }
+}
+
 export async function POST(req: Request) {
   try {
     const authorization = req.headers.get("authorization")
@@ -80,18 +100,21 @@ export async function POST(req: Request) {
     if (!takeRateLimit(authData.user.id)) return error("Too many analysis requests. Try again in a minute.", 429)
 
     const body = await req.json()
-    const { mode, image, imagePath, details } = body as {
+    const { mode, image, imagePath, details, description } = body as {
       mode?: string
       image?: unknown
       imagePath?: unknown
       details?: unknown
+      description?: unknown
     }
     const apiKey = process.env.GEMINI_API_KEY
     if (!apiKey) {
       return error("Server API key not configured", 500)
     }
 
-    if ((mode !== "food" && mode !== "workout") || (imagePath && mode !== "food")) return error("Invalid request", 400)
+    const validModes: Mode[] = ["food", "workout", "food_text", "workout_text"]
+    if (!validModes.includes(mode as Mode)) return error("Invalid request", 400)
+    if (imagePath && mode !== "food") return error("Invalid request", 400)
     if (typeof details !== "undefined" && (typeof details !== "string" || details.length > MAX_DETAILS_LENGTH)) return error("Invalid request", 400)
     const analysisDetails = typeof details === "string" ? details : undefined
 
@@ -118,6 +141,23 @@ export async function POST(req: Request) {
       const imgPart = parseImage(image)
       if (!imgPart) return error("Invalid image", 400)
       const result = await retry("gemini", () => analyzeWorkout(imgPart, apiKey))
+      return NextResponse.json(result)
+    }
+
+    if (mode === "food_text") {
+      if (typeof description !== "string" || description.trim().length === 0 || description.length > MAX_DESCRIPTION_LENGTH) {
+        return error("Invalid description", 400)
+      }
+      const result = await retry("gemini", () => analyzeFoodText(description.trim(), apiKey))
+      return NextResponse.json(result)
+    }
+
+    if (mode === "workout_text") {
+      if (typeof description !== "string" || description.trim().length === 0 || description.length > MAX_DESCRIPTION_LENGTH) {
+        return error("Invalid description", 400)
+      }
+      const pesoKg = await getUserPesoKg(authData.user.id)
+      const result = await retry("gemini", () => analyzeWorkoutText(description.trim(), apiKey, pesoKg))
       return NextResponse.json(result)
     }
 

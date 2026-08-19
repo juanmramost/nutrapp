@@ -199,3 +199,26 @@ Analiza estos 3 días según las reglas indicadas y dame la recomendación de ho
     return error("No se pudo generar la recomendación. Inténtalo de nuevo en unos segundos.", 503)
   }
 }
+
+export async function DELETE(req: Request) {
+  try {
+    const user = await getAuthedUser(req)
+    if (!user) return error("Authentication required", 401)
+
+    const admin = getAdminClient()
+    const today = dateKey(new Date())
+
+    const { error: deleteError } = await admin
+      .from("recommendations")
+      .delete()
+      .eq("user_id", user.id)
+      .eq("fecha", today)
+
+    if (deleteError) throw deleteError
+
+    return NextResponse.json({ ok: true })
+  } catch (caught) {
+    console.error("recommendations DELETE failed", caught)
+    return error("No se pudo invalidar la recomendación.", 503)
+  }
+}

@@ -1,14 +1,14 @@
 import type { FoodAnalysis, WorkoutAnalysis } from "./types"
- 
+
 const MODEL = "gemini-3.5-flash"
 const ENDPOINT = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent`
- 
+
 export interface ImagePart {
   mimeType: string
   /** Base64 sin el prefijo data: */
   data: string
 }
- 
+
 /** Convierte un File a { mimeType, data(base64) } para enviar a Gemini. */
 export function fileToImagePart(file: File): Promise<ImagePart> {
   return new Promise((resolve, reject) => {
@@ -71,7 +71,7 @@ export async function resizeImage(file: File, maxDim = 1024, quality = 0.75): Pr
   const name = file.name.replace(/\.[^.]+$/, "") + ".jpg"
   return new File([blob], name, { type: "image/jpeg" })
 }
- 
+
 interface GenerateOptions {
   apiKey: string
   systemInstruction: string
@@ -79,12 +79,12 @@ interface GenerateOptions {
   image: ImagePart
   responseSchema: Record<string, unknown>
 }
- 
+
 async function generateJson<T>(opts: GenerateOptions): Promise<T> {
   if (!opts.apiKey) {
     throw new Error("Falta la API Key de Gemini. Configúrala en Ajustes.")
   }
- 
+
   const res = await fetch(`${ENDPOINT}?key=${encodeURIComponent(opts.apiKey)}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -106,7 +106,7 @@ async function generateJson<T>(opts: GenerateOptions): Promise<T> {
       },
     }),
   })
- 
+
   if (!res.ok) {
     let detail = ""
     try {
@@ -120,18 +120,75 @@ async function generateJson<T>(opts: GenerateOptions): Promise<T> {
     }
     throw new Error(`Error de Gemini (${res.status}). ${detail}`.trim())
   }
- 
+
   const json = await res.json()
   const text: string | undefined = json?.candidates?.[0]?.content?.parts?.[0]?.text
   if (!text) throw new Error("Gemini no devolvió resultados. Prueba con otra foto.")
- 
+
   try {
     return JSON.parse(text) as T
   } catch {
     throw new Error("No se pudo interpretar la respuesta de la IA.")
   }
 }
- 
+
+interface GenerateTextOptions {
+  apiKey: string
+  systemInstruction: string
+  prompt: string
+  responseSchema: Record<string, unknown>
+}
+
+/** Igual que generateJson pero sin imagen, solo texto (para análisis manual por descripción). */
+async function generateJsonText<T>(opts: GenerateTextOptions): Promise<T> {
+  if (!opts.apiKey) {
+    throw new Error("Falta la API Key de Gemini. Configúrala en Ajustes.")
+  }
+
+  const res = await fetch(`${ENDPOINT}?key=${encodeURIComponent(opts.apiKey)}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      systemInstruction: { parts: [{ text: opts.systemInstruction }] },
+      contents: [
+        {
+          role: "user",
+          parts: [{ text: opts.prompt }],
+        },
+      ],
+      generationConfig: {
+        responseMimeType: "application/json",
+        responseSchema: opts.responseSchema,
+        temperature: 0.2,
+      },
+    }),
+  })
+
+  if (!res.ok) {
+    let detail = ""
+    try {
+      const err = await res.json()
+      detail = err?.error?.message ?? ""
+    } catch {
+      /* ignore */
+    }
+    if (res.status === 400 || res.status === 403) {
+      throw new Error(`API Key inválida o sin permisos. ${detail}`.trim())
+    }
+    throw new Error(`Error de Gemini (${res.status}). ${detail}`.trim())
+  }
+
+  const json = await res.json()
+  const text: string | undefined = json?.candidates?.[0]?.content?.parts?.[0]?.text
+  if (!text) throw new Error("Gemini no devolvió resultados. Prueba con otra descripción.")
+
+  try {
+    return JSON.parse(text) as T
+  } catch {
+    throw new Error("No se pudo interpretar la respuesta de la IA.")
+  }
+}
+
 const FOOD_SYSTEM = `Eres un experto nutricionista. Analizarás UNA SOLA FOTO de comida y, opcionalmente, notas adicionales proporcionadas por el usuario.
 
 Reglas estrictas:
@@ -167,7 +224,29 @@ Ejemplo de salida JSON exacta (usa este esquema):
 }
 
 Instrucción final: aplica las reglas anteriores. Si el usuario proporcionó detalles, inclúyelos literalmente y priorízalos. NO devuelvas texto fuera del JSON y sigue exactamente el formato solicitado.`
- 
+
+const FOOD_RESPONSE_SCHEMA = {
+  type: "object",
+  properties: {
+    plato: { type: "string" },
+    calorias_totales: { type: "number" },
+    proteinas_g: { type: "number" },
+    carbohidratos_g: { type: "number" },
+    grasas_g: { type: "number" },
+    ingredientes: { type: "array", items: { type: "string" } },
+    confianza_estimacion: { type: "string" },
+  },
+  required: [
+    "plato",
+    "calorias_totales",
+    "proteinas_g",
+    "carbohidratos_g",
+    "grasas_g",
+    "ingredientes",
+    "confianza_estimacion",
+  ],
+}
+
 export function analyzeFood(image: ImagePart, apiKey: string, details?: string): Promise<FoodAnalysis> {
   const promptBase = "Analiza este plato de comida."
   const prompt = details && details.trim().length > 0 ? `${promptBase} Información adicional del usuario: ${details}. Usa esta información al estimar ingredientes y cantidades.` : promptBase
@@ -177,46 +256,83 @@ export function analyzeFood(image: ImagePart, apiKey: string, details?: string):
     systemInstruction: FOOD_SYSTEM,
     prompt,
     image,
-    responseSchema: {
-      type: "object",
-      properties: {
-        plato: { type: "string" },
-        calorias_totales: { type: "number" },
-        proteinas_g: { type: "number" },
-        carbohidratos_g: { type: "number" },
-        grasas_g: { type: "number" },
-        ingredientes: { type: "array", items: { type: "string" } },
-        confianza_estimacion: { type: "string" },
-      },
-      required: [
-        "plato",
-        "calorias_totales",
-        "proteinas_g",
-        "carbohidratos_g",
-        "grasas_g",
-        "ingredientes",
-        "confianza_estimacion",
-      ],
-    },
+    responseSchema: FOOD_RESPONSE_SCHEMA,
   })
 }
- 
+
+const FOOD_TEXT_SYSTEM = `Eres un experto nutricionista. El usuario describirá en texto lo que ha comido (plato, ingredientes y, si las tiene, cantidades en gramos o unidades). Tu tarea es estimar las calorías y macronutrientes de la forma MÁS PRECISA POSIBLE, usando tablas nutricionales estándar por 100g y las cantidades indicadas.
+
+Reglas estrictas:
+- Si el usuario da gramos o cantidades exactas (ej. "200g de pechuga de pollo", "1 taza de arroz"), usa esas cantidades como base del cálculo, no una porción genérica.
+- Si el usuario NO da cantidades, asume una porción individual estándar razonable para ese plato y refleja esa incertidumbre en 'confianza_estimacion' ("media" o "baja").
+- Si describe varios alimentos o un plato combinado, suma el total de todos los componentes.
+- No inventes ingredientes que el usuario no mencionó explícitamente.
+- Sé riguroso con las cifras: usa valores nutricionales reales conocidos (ej. pechuga de pollo cruda ≈165 kcal/100g, arroz blanco cocido ≈130 kcal/100g), no aproximaciones vagas.
+- Devuelve ÚNICAMENTE un objeto JSON válido y nada más (sin texto explicativo, sin comentarios, sin markdown).
+
+Formato requerido (campos exactos, igual que un análisis por foto):
+- 'plato': string (nombre descriptivo del plato)
+- 'calorias_totales': number (kcal, entero redondeado)
+- 'proteinas_g': number (gramos, entero redondeado)
+- 'carbohidratos_g': number (gramos, entero redondeado)
+- 'grasas_g': number (gramos, entero redondeado)
+- 'ingredientes': array de strings (solo los mencionados por el usuario)
+- 'confianza_estimacion': string ("alta" | "media" | "baja")`
+
+export function analyzeFoodText(description: string, apiKey: string): Promise<FoodAnalysis> {
+  return generateJsonText<FoodAnalysis>({
+    apiKey,
+    systemInstruction: FOOD_TEXT_SYSTEM,
+    prompt: `Analiza esta descripción de comida escrita por el usuario: "${description}"`,
+    responseSchema: FOOD_RESPONSE_SCHEMA,
+  })
+}
+
 const WORKOUT_SYSTEM =
   "Analiza esta captura de entrenamiento (reloj, app o máquina de gimnasio). Extrae las calorías activas quemadas y el tipo de actividad realizada. Devuelve UNICAMENTE un JSON con tipo_actividad (string) y calorias_activas (number)."
- 
+
+const WORKOUT_RESPONSE_SCHEMA = {
+  type: "object",
+  properties: {
+    tipo_actividad: { type: "string" },
+    calorias_activas: { type: "number" },
+  },
+  required: ["tipo_actividad", "calorias_activas"],
+}
+
 export function analyzeWorkout(image: ImagePart, apiKey: string): Promise<WorkoutAnalysis> {
   return generateJson<WorkoutAnalysis>({
     apiKey,
     systemInstruction: WORKOUT_SYSTEM,
     prompt: "Extrae los datos de este entrenamiento.",
     image,
-    responseSchema: {
-      type: "object",
-      properties: {
-        tipo_actividad: { type: "string" },
-        calorias_activas: { type: "number" },
-      },
-      required: ["tipo_actividad", "calorias_activas"],
-    },
+    responseSchema: WORKOUT_RESPONSE_SCHEMA,
+  })
+}
+
+const WORKOUT_TEXT_SYSTEM = `Eres un entrenador personal experto en estimar el gasto calórico de sesiones de ejercicio a partir de una descripción en texto (tipo de actividad, duración, intensidad, series/repeticiones si aplica).
+
+Reglas:
+- Usa valores MET (Metabolic Equivalent of Task) estándar según el tipo e intensidad de la actividad descrita para calcular las calorías quemadas, combinados con el peso del usuario si se proporciona (si no, asume 75kg).
+- Si el usuario da duración exacta, úsala. Si no la da, asume una duración estándar razonable para ese tipo de entreno (30-45 min) y sé conservador con la estimación.
+- Resume el tipo de actividad en un texto breve y claro (ej. "Pecho y tríceps", "Carrera continua", "HIIT").
+- Devuelve ÚNICAMENTE un objeto JSON válido, sin texto adicional ni markdown.
+
+Formato requerido (campos exactos):
+- 'tipo_actividad': string (resumen breve del entrenamiento)
+- 'calorias_activas': number (kcal quemadas, entero redondeado)`
+
+export function analyzeWorkoutText(description: string, apiKey: string, pesoKg?: number): Promise<WorkoutAnalysis> {
+  const pesoTexto = pesoKg && Number.isFinite(pesoKg) && pesoKg > 0 ? `${pesoKg} kg` : "no especificado (asume 75 kg)"
+  const prompt = `Peso del usuario: ${pesoTexto}
+Descripción del entrenamiento: "${description}"
+
+Estima las calorías activas quemadas.`
+
+  return generateJsonText<WorkoutAnalysis>({
+    apiKey,
+    systemInstruction: WORKOUT_TEXT_SYSTEM,
+    prompt,
+    responseSchema: WORKOUT_RESPONSE_SCHEMA,
   })
 }

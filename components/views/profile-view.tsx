@@ -10,6 +10,7 @@ import { useTracker } from "@/hooks/use-tracker"
 import { useAuth } from "@/hooks/use-auth"
 import { calcBasal } from "@/lib/nutrition"
 import { calculateImc, getProfileImc, getImcCategory } from "@/lib/profile"
+import supabase from "@/lib/supabaseClient"
 import type { Genero, Objetivo, UserProfile } from "@/lib/types"
 
 function Field({
@@ -49,6 +50,22 @@ const OBJETIVOS: { value: Objetivo; label: string }[] = [
   { value: "mejorar_salud", label: "Mejorar salud" },
 ]
 
+/** Invalida la recomendación de hoy en el servidor tras un cambio de perfil, si el usuario está logueado. */
+async function invalidateTodayRecommendation() {
+  try {
+    const { data } = await supabase.auth.getSession()
+    const token = data.session?.access_token
+    if (!token) return
+    await fetch("/api/recommendations", {
+      method: "DELETE",
+      headers: { Authorization: `Bearer ${token}` },
+    })
+    window.dispatchEvent(new CustomEvent("recommendation:invalidate"))
+  } catch {
+    /* ignore: si falla, la recomendación de hoy simplemente no se actualiza hasta mañana */
+  }
+}
+
 export function ProfileView() {
   const { profile, setProfile } = useTracker()
   const { user, isGuest, signOut, clearGuest } = useAuth()
@@ -73,6 +90,7 @@ export function ProfileView() {
     setProfile(next)
     setDraft(next)
     setSavedProfile(true)
+    void invalidateTodayRecommendation()
   }
 
   return (

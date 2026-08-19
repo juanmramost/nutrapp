@@ -101,6 +101,18 @@ export function Recommendations() {
     }
   }, [isAuthed, hasEntriesToday, recommendation])
 
+  // Si el perfil cambió (objetivo, IMC, peso...), la recomendación de hoy queda invalidada
+  // en el servidor. Reseteamos el estado local para que se regenere automáticamente.
+  useEffect(() => {
+    function handleInvalidate() {
+      setRecommendation(null)
+      requestedRef.current = false
+    }
+
+    window.addEventListener("recommendation:invalidate", handleInvalidate)
+    return () => window.removeEventListener("recommendation:invalidate", handleInvalidate)
+  }, [])
+
   if (!isAuthed) return null
 
   const toneStyle = recommendation ? TONE_STYLES[recommendation.tono] : null
