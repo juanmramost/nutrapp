@@ -1,7 +1,7 @@
 "use client"
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react"
-import type { DailyLogs, LogEntry, UserProfile } from "@/lib/types"
+import type { DailyLogs, LogEntry, MealEntry, UserProfile } from "@/lib/types"
 import {
   addEntry,
   dateKey,
@@ -22,6 +22,8 @@ import { loadDeficits, saveDeficits } from "@/lib/storage"
 import { useAuth } from "@/hooks/use-auth"
 import { calcBasal, computeTotals, type DayTotals } from "@/lib/nutrition"
 
+const MEAL_HISTORY_LIMIT = 10
+
 interface TrackerContextValue {
   ready: boolean
   profile: UserProfile
@@ -29,6 +31,8 @@ interface TrackerContextValue {
   todayKey: string
   todayEntries: LogEntry[]
   totals: DayTotals
+  /** Últimas comidas únicas registradas (por nombre de plato), más recientes primero. Máx. 10. */
+  mealHistory: MealEntry[]
   setProfile: (p: UserProfile) => void
   setApiKey: (k: string) => void
   addToday: (entry: LogEntry) => void
@@ -197,6 +201,28 @@ export function TrackerProvider({ children }: { children: React.ReactNode }) {
   )
 
   const totals = useMemo(() => computeTotals(todayEntries, basal), [todayEntries, basal])
+
+  /** Últimas comidas únicas (por nombre de plato, sin distinguir mayúsculas/espacios), más recientes primero. */
+  const mealHistory = useMemo<MealEntry[]>(() => {
+    const allMeals: MealEntry[] = []
+    for (const dateEntries of Object.values(logs)) {
+      for (const entry of dateEntries) {
+        if (entry.type === "meal") allMeals.push(entry)
+      }
+    }
+    allMeals.sort((a, b) => b.createdAt - a.createdAt)
+
+    const seen = new Set<string>()
+    const unique: MealEntry[] = []
+    for (const meal of allMeals) {
+      const key = meal.plato.trim().toLowerCase()
+      if (!key || seen.has(key)) continue
+      seen.add(key)
+      unique.push(meal)
+      if (unique.length >= MEAL_HISTORY_LIMIT) break
+    }
+    return unique
+  }, [logs])
 
   const removeDay = useCallback(
     (dk: string) => {
@@ -391,6 +417,7 @@ export function TrackerProvider({ children }: { children: React.ReactNode }) {
     todayKey,
     todayEntries,
     totals,
+    mealHistory,
     setProfile,
     setApiKey,
     addToday,

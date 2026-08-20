@@ -13,7 +13,7 @@ import { useTracker } from "@/hooks/use-tracker"
 import { fileToImagePart, resizeImage } from "@/lib/gemini"
 import supabase from "@/lib/supabaseClient"
 import { newId } from "@/lib/storage"
-import type { FoodAnalysis } from "@/lib/types"
+import type { FoodAnalysis, MealEntry } from "@/lib/types"
 
 interface Props {
   onSaved: () => void
@@ -50,7 +50,7 @@ function NumberField({
 }
 
 export function ScanFoodView({ onSaved }: Props) {
-  const { addToday } = useTracker()
+  const { addToday, mealHistory } = useTracker()
 
   // Foto (IA por imagen)
   const [file, setFile] = useState<File | null>(null)
@@ -85,6 +85,21 @@ export function ScanFoodView({ onSaved }: Props) {
     setError(null)
     setFile(f)
     setPreviewUrl(URL.createObjectURL(f))
+  }
+
+  /** Rellena la tarjeta de confirmación directamente desde el historial, sin llamar a Gemini. */
+  function handleSelectHistory(meal: MealEntry) {
+    setError(null)
+    setResult({
+      plato: meal.plato,
+      calorias_totales: meal.calorias,
+      proteinas_g: meal.proteinas_g,
+      carbohidratos_g: meal.carbohidratos_g,
+      grasas_g: meal.grasas_g,
+      ingredientes: meal.ingredientes,
+      confianza_estimacion: meal.confianza ?? "alta",
+    })
+    setSavedDetails(meal.detalles)
   }
 
   async function getAuthHeaders() {
@@ -253,6 +268,24 @@ export function ScanFoodView({ onSaved }: Props) {
               </Button>
             )}
           </Card>
+
+          {mealHistory.length > 0 && (
+            <div className="flex flex-col gap-2">
+              <Label className="text-xs text-muted-foreground">Tus platos recientes</Label>
+              <div className="flex flex-wrap gap-2">
+                {mealHistory.map((meal) => (
+                  <button
+                    key={meal.id}
+                    type="button"
+                    onClick={() => handleSelectHistory(meal)}
+                    className="rounded-full bg-muted px-3 py-1.5 text-xs font-medium text-foreground transition-colors hover:bg-muted/70"
+                  >
+                    {meal.plato} · {meal.calorias} kcal
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
         </TabsContent>
       </Tabs>
 
