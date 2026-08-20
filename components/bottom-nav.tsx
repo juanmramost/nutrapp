@@ -1,15 +1,16 @@
 "use client"
 
 import { motion } from "motion/react"
-import { Camera, Dumbbell, Home, Settings, BarChart } from "lucide-react"
+import { Camera, ChefHat, Dumbbell, Home, Settings, BarChart } from "lucide-react"
 import type { LucideIcon } from "lucide-react"
 
-export type TabId = "dashboard" | "scan" | "workout" | "profile" | "progreso"
+export type TabId = "dashboard" | "scan" | "workout" | "cocina" | "profile" | "progreso"
 
 const TABS: { id: TabId; label: string; icon: LucideIcon }[] = [
   { id: "dashboard", label: "Hoy", icon: Home },
   { id: "scan", label: "Comida", icon: Camera },
   { id: "workout", label: "Entreno", icon: Dumbbell },
+  { id: "cocina", label: "Cocina", icon: ChefHat },
   { id: "progreso", label: "Progreso", icon: BarChart },
   { id: "profile", label: "Perfil", icon: Settings },
 ]

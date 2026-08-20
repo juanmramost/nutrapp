@@ -11,6 +11,7 @@ import { ScanFoodView } from "@/components/views/scan-food-view"
 import { WorkoutView } from "@/components/views/workout-view"
 import { ProfileView } from "@/components/views/profile-view"
 import { ProgresoView } from "@/components/views/progreso-view"
+import { CocinaView } from "@/components/views/cocina-view"
 
 function AppShell() {
   const { ready } = useTracker()
@@ -37,6 +38,7 @@ function AppShell() {
           {tab === "dashboard" && <DashboardView />}
           {tab === "scan" && <ScanFoodView onSaved={() => setTab("dashboard")} />}
           {tab === "workout" && <WorkoutView onSaved={() => setTab("dashboard")} />}
+          {tab === "cocina" && <CocinaView />}
           {tab === "profile" && <ProfileView />}
           {tab === "progreso" && <ProgresoView />}
         </motion.div>

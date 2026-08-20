@@ -73,3 +73,27 @@ export interface DailyRecommendation {
   tono: RecommendationTone
   created_at: string
 }
+
+/** Un ingrediente dentro de un plato guardado por el usuario. */
+export interface DishIngredient {
+  nombre: string
+  cantidad: number
+  /** Unidad de medida, ej. "g", "ml", "unidad". Por defecto se asume "g". */
+  unidad?: string
+}
+
+export type DishOrigin = "manual" | "recomendado" | "que_cocinar"
+
+/** Un plato guardado permanentemente por el usuario en "Mis platos". */
+export interface SavedDish {
+  id: string
+  nombre: string
+  ingredientes: DishIngredient[]
+  calorias: number
+  proteinas_g: number
+  carbohidratos_g: number
+  grasas_g: number
+  instrucciones?: string
+  origen: DishOrigin
+  created_at: string
+}

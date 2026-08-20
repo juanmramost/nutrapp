@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { motion } from "motion/react"
 import { Check, Loader2, Sparkles, TriangleAlert } from "lucide-react"
 import { Card } from "@/components/ui/card"
@@ -10,10 +10,12 @@ import { Label } from "@/components/ui/label"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { ImagePicker } from "@/components/image-picker"
 import { useTracker } from "@/hooks/use-tracker"
+import { useAuth } from "@/hooks/use-auth"
 import { fileToImagePart, resizeImage } from "@/lib/gemini"
 import supabase from "@/lib/supabaseClient"
 import { newId } from "@/lib/storage"
-import type { FoodAnalysis, MealEntry } from "@/lib/types"
+import { listDishes } from "@/lib/dishes"
+import type { FoodAnalysis, MealEntry, SavedDish } from "@/lib/types"
 
 interface Props {
   onSaved: () => void
@@ -51,6 +53,12 @@ function NumberField({
 
 export function ScanFoodView({ onSaved }: Props) {
   const { addToday, mealHistory } = useTracker()
+  const { user } = useAuth()
+
+  // Platos guardados (Mis platos)
+  const [savedDishes, setSavedDishes] = useState<SavedDish[]>([])
+  const [selectedDishId, setSelectedDishId] = useState<string>("")
+  const [portion, setPortion] = useState<string>("1")
 
   // Foto (IA por imagen)
   const [file, setFile] = useState<File | null>(null)
@@ -65,6 +73,15 @@ export function ScanFoodView({ onSaved }: Props) {
   const [error, setError] = useState<string | null>(null)
   const [result, setResult] = useState<FoodAnalysis | null>(null)
   const [savedDetails, setSavedDetails] = useState<string | undefined>(undefined)
+
+  useEffect(() => {
+    async function loadDishes() {
+      if (!user) return
+      const list = await listDishes(user.id)
+      setSavedDishes(list)
+    }
+    loadDishes()
+  }, [user])
 
   function resetPhoto() {
     setFile(null)
@@ -100,6 +117,26 @@ export function ScanFoodView({ onSaved }: Props) {
       confianza_estimacion: meal.confianza ?? "alta",
     })
     setSavedDetails(meal.detalles)
+  }
+
+  /** Aplica un plato guardado con la porción indicada, sin llamar a Gemini. */
+  function handleApplyDish() {
+    const dish = savedDishes.find((d) => d.id === selectedDishId)
+    if (!dish) return
+    const factor = Number(portion) > 0 ? Number(portion) : 1
+    setError(null)
+    setResult({
+      plato: factor === 1 ? dish.nombre : `${dish.nombre} (${factor}x porción)`,
+      calorias_totales: Math.round(dish.calorias * factor),
+      proteinas_g: Math.round(dish.proteinas_g * factor),
+      carbohidratos_g: Math.round(dish.carbohidratos_g * factor),
+      grasas_g: Math.round(dish.grasas_g * factor),
+      ingredientes: dish.ingredientes.map(
+        (i) => `${i.nombre} (${Math.round(i.cantidad * factor)}${i.unidad ?? "g"})`,
+      ),
+      confianza_estimacion: "alta",
+    })
+    setSavedDetails(undefined)
   }
 
   async function getAuthHeaders() {
@@ -268,6 +305,44 @@ export function ScanFoodView({ onSaved }: Props) {
               </Button>
             )}
           </Card>
+
+          {savedDishes.length > 0 && (
+            <Card className="gap-3 px-4">
+              <Label className="text-xs text-muted-foreground">Usar un plato guardado</Label>
+              <div className="flex items-center gap-2">
+                <select
+                  value={selectedDishId}
+                  onChange={(e) => setSelectedDishId(e.target.value)}
+                  className="h-11 flex-1 rounded-xl border border-input bg-transparent px-3 text-sm outline-none focus:ring-2 focus:ring-ring"
+                >
+                  <option value="">Elige un plato...</option>
+                  {savedDishes.map((dish) => (
+                    <option key={dish.id} value={dish.id}>
+                      {dish.nombre} · {dish.calorias} kcal
+                    </option>
+                  ))}
+                </select>
+                <Input
+                  type="number"
+                  inputMode="decimal"
+                  step="0.5"
+                  min="0.5"
+                  value={portion}
+                  onChange={(e) => setPortion(e.target.value)}
+                  className="h-11 w-16 tabular-nums"
+                />
+                <span className="shrink-0 text-xs text-muted-foreground">porc.</span>
+              </div>
+              <Button
+                variant="outline"
+                className="h-11 w-full gap-2"
+                onClick={handleApplyDish}
+                disabled={!selectedDishId}
+              >
+                Cargar plato
+              </Button>
+            </Card>
+          )}
 
           {mealHistory.length > 0 && (
             <div className="flex flex-col gap-2">
