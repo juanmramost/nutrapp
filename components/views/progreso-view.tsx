@@ -4,7 +4,15 @@ import { useEffect, useState } from "react"
 import { useTracker } from "@/hooks/use-tracker"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Dialog, DialogContent, DialogHeader, DialogFooter, DialogTitle, DialogDescription, DialogClose } from "@/components/ui/dialog"
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogFooter,
+  DialogTitle,
+  DialogDescription,
+  DialogClose,
+} from "@/components/ui/dialog"
 import { dateKey, loadDeficits, loadLogs } from "@/lib/storage"
 
 function formatDate(k: string) {
@@ -13,31 +21,43 @@ function formatDate(k: string) {
 
 function lastNDates(n: number) {
   const arr: string[] = []
+
   for (let i = 0; i < n; i++) {
     const d = new Date()
     d.setDate(d.getDate() - i)
     arr.push(dateKey(d))
   }
+
   return arr
 }
 
 function loadVisibleDeficits() {
   const deficits = loadDeficits()
   const logs = loadLogs()
-  return Object.fromEntries(Object.entries(deficits).filter(([key]) => (logs[key] ?? []).length > 0))
+
+  return Object.fromEntries(
+    Object.entries(deficits).filter(
+      ([key]) => (logs[key] ?? []).length > 0
+    )
+  )
 }
 
 export function ProgresoView() {
-  const [deficits, setDeficits] = useState<Record<string, number>>(() => loadVisibleDeficits())
+  const [deficits, setDeficits] = useState<Record<string, number>>(
+    () => loadVisibleDeficits()
+  )
+
   const [confirmBulkOpen, setConfirmBulkOpen] = useState(false)
 
   useEffect(() => {
     function handler() {
       setDeficits(loadVisibleDeficits())
     }
+
     if (typeof window !== "undefined") {
       window.addEventListener("deficits:changed", handler)
     }
+
     return () => {
       if (typeof window !== "undefined") {
         window.removeEventListener("deficits:changed", handler)
@@ -48,10 +68,15 @@ export function ProgresoView() {
   const { removeDay } = useTracker()
 
   function handleDelete(dk: string) {
-    const ok = window.confirm(`Eliminar registro para la fecha ${dk}?`)
+    const ok = window.confirm(
+      `Eliminar registro para la fecha ${dk}?`
+    )
+
     if (!ok) return
+
     removeDay(dk)
-    // reload visible deficits
+
+    // Recargar déficits visibles
     setDeficits(loadVisibleDeficits())
   }
 
@@ -61,34 +86,95 @@ export function ProgresoView() {
 
   function confirmBulkDelete() {
     const keys = last7
+
     for (const k of keys) {
       removeDay(k)
     }
-    // reload visible deficits
+
+    // Recargar déficits visibles
     setDeficits(loadVisibleDeficits())
     setConfirmBulkOpen(false)
   }
 
   const last7 = lastNDates(7)
-  const weeklyTotal = last7.reduce((s, d) => s + (deficits[d] ?? 0), 0)
+
+  const weeklyTotal = last7.reduce(
+    (s, d) => s + (deficits[d] ?? 0),
+    0
+  )
 
   return (
     <div className="flex flex-col gap-5 px-4 pb-4 pt-8">
       <header>
-        <h1 className="text-2xl font-bold tracking-tight">Progreso</h1>
-        <p className="text-sm text-muted-foreground">Registra el déficit diario y revisa el total semanal</p>
+        <h1 className="text-2xl font-bold tracking-tight">
+          Progreso
+        </h1>
+
+        <p className="text-sm text-muted-foreground">
+          Registra el déficit diario y revisa el total semanal
+        </p>
       </header>
 
+      {/* Déficit diario */}
       <Card className="gap-4 px-4">
-        <h2 className="text-sm font-semibold">Déficit diario (automático)</h2>
+        <h2 className="text-sm font-semibold">
+          Déficit diario (automático)
+        </h2>
+
         <p className="text-xs text-muted-foreground">
-          Los déficits se registran automáticamente al guardar comidas o entrenos. Aquí puedes revisar y
-          eliminar registros si es necesario.
+          Los déficits se registran automáticamente al guardar comidas o
+          entrenos. Aquí puedes revisar y eliminar registros si es necesario.
         </p>
       </Card>
 
+      {/* Resumen semanal */}
       <Card className="gap-4 px-4">
-        <h2 className="text-sm font-semibold">Últimos registros</h2>
+        <h2 className="text-sm font-semibold">
+          Resumen semanal
+        </h2>
+
+        <p className="text-sm text-muted-foreground">
+          Total déficit últimos 7 días
+        </p>
+
+        <div className="text-3xl font-bold tabular-nums text-deficit">
+          {weeklyTotal}
+        </div>
+
+        <div className="mt-2 flex gap-2">
+          {last7.map((d) => (
+            <div
+              key={d}
+              className="w-1/6 rounded-xl bg-muted/50 p-2 text-center text-xs"
+            >
+              <div className="text-muted-foreground">
+                {d.slice(5)}
+              </div>
+
+              <div className="font-medium">
+                {deficits[d] ?? 0} kcal
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <div className="mt-4 flex gap-2">
+          <Button
+            variant="secondary"
+            onClick={handleBulkDelete}
+            className="w-full"
+          >
+            Eliminar últimos 7 registros
+          </Button>
+        </div>
+      </Card>
+
+      {/* Últimos registros */}
+      <Card className="gap-4 px-4">
+        <h2 className="text-sm font-semibold">
+          Últimos registros
+        </h2>
+
         <div className="w-full overflow-auto">
           <table className="w-full text-sm">
             <thead>
@@ -98,23 +184,37 @@ export function ProgresoView() {
                 <th className="py-2">Acciones</th>
               </tr>
             </thead>
+
             <tbody>
               {Object.keys(deficits)
                 .sort((a, b) => (a < b ? 1 : -1))
                 .map((d) => (
                   <tr key={d} className="border-t">
-                    <td className="py-2">{formatDate(d)}</td>
-                    <td className="py-2">{deficits[d]}</td>
                     <td className="py-2">
-                          <Button variant="ghost" onClick={() => handleDelete(d)}>
-                            Eliminar
-                          </Button>
+                      {formatDate(d)}
+                    </td>
+
+                    <td className="py-2">
+                      {deficits[d]}
+                    </td>
+
+                    <td className="py-2">
+                      <Button
+                        variant="ghost"
+                        onClick={() => handleDelete(d)}
+                      >
+                        Eliminar
+                      </Button>
                     </td>
                   </tr>
                 ))}
+
               {Object.keys(deficits).length === 0 && (
                 <tr>
-                  <td colSpan={3} className="py-4 text-center text-xs text-muted-foreground">
+                  <td
+                    colSpan={3}
+                    className="py-4 text-center text-xs text-muted-foreground"
+                  >
                     No hay registros aún
                   </td>
                 </tr>
@@ -124,39 +224,34 @@ export function ProgresoView() {
         </div>
       </Card>
 
-      <Card className="gap-4 px-4">
-        <h2 className="text-sm font-semibold">Resumen semanal</h2>
-        <p className="text-sm text-muted-foreground">Total déficit últimos 7 días</p>
-        <div className="text-3xl font-bold tabular-nums text-deficit">{weeklyTotal}</div>
-        <div className="flex gap-2 mt-2">
-          {last7.map((d) => (
-            <div key={d} className="rounded-xl bg-muted/50 p-2 text-center text-xs w-1/6">
-              <div className="text-muted-foreground">{d.slice(5)}</div>
-              <div className="font-medium">{deficits[d] ?? 0} kcal</div>
-            </div>
-          ))}
-        </div>
-        <div className="mt-4 flex gap-2">
-          <Button variant="secondary" onClick={handleBulkDelete} className="w-full">
-            Eliminar últimos 7 registros
-          </Button>
-        </div>
-      </Card>
-
-      {/* single delete uses native confirm() via handleDelete */}
-
-      {/* Confirm bulk delete */}
-      <Dialog open={confirmBulkOpen} onOpenChange={setConfirmBulkOpen}>
+      {/* Confirmación de eliminación masiva */}
+      <Dialog
+        open={confirmBulkOpen}
+        onOpenChange={setConfirmBulkOpen}
+      >
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Eliminar últimos registros</DialogTitle>
-            <DialogDescription>Se eliminarán los registros de los últimos 7 días. ¿Confirmas?</DialogDescription>
+            <DialogTitle>
+              Eliminar últimos registros
+            </DialogTitle>
+
+            <DialogDescription>
+              Se eliminarán los registros de los últimos 7 días.
+              ¿Confirmas?
+            </DialogDescription>
           </DialogHeader>
+
           <DialogFooter>
             <DialogClose>
-              <Button variant="outline">Cancelar</Button>
+              <Button variant="outline">
+                Cancelar
+              </Button>
             </DialogClose>
-            <Button onClick={confirmBulkDelete} className="bg-destructive text-destructive-foreground">
+
+            <Button
+              onClick={confirmBulkDelete}
+              className="bg-destructive text-destructive-foreground"
+            >
               Eliminar
             </Button>
           </DialogFooter>
