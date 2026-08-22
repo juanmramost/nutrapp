@@ -36,10 +36,13 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="es" className={`dark bg-background ${geistSans.variable} ${geistMono.variable}`}>
-      <body className="font-sans antialiased">
-        {children}
-        {process.env.NODE_ENV === 'production' && <Analytics />}
-      </body>
+  <body className="font-sans antialiased">
+  <main className="pt-[calc(env(safe-area-inset-top)+8px)]">
+    {children}
+  </main>
+
+  {process.env.NODE_ENV === 'production' && <Analytics />}
+</body>
     </html>
   )
 }
