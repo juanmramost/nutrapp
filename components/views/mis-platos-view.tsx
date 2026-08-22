@@ -2,15 +2,33 @@
 
 import { useEffect, useState } from "react"
 import { motion } from "motion/react"
-import { BookOpen, Check, Loader2, Plus, Sparkles, Trash2, TriangleAlert, X } from "lucide-react"
+import {
+  BookOpen,
+  Check,
+  Loader2,
+  Plus,
+  Sparkles,
+  Trash2,
+  TriangleAlert,
+  X,
+} from "lucide-react"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { useAuth } from "@/hooks/use-auth"
 import supabase from "@/lib/supabaseClient"
-import { listDishes, createDish, updateDish, deleteDish } from "@/lib/dishes"
-import type { DishIngredient, FoodAnalysis, SavedDish } from "@/lib/types"
+import {
+  listDishes,
+  createDish,
+  updateDish,
+  deleteDish,
+} from "@/lib/dishes"
+import type {
+  DishIngredient,
+  FoodAnalysis,
+  SavedDish,
+} from "@/lib/types"
 
 interface Props {
   onBack: () => void
@@ -23,49 +41,94 @@ interface IngredientDraft {
 }
 
 function emptyIngredient(): IngredientDraft {
-  return { nombre: "", cantidad: "", unidad: "g" }
+  return {
+    nombre: "",
+    cantidad: "",
+    unidad: "g",
+  }
 }
 
 function emptyMacros() {
-  return { calorias: 0, proteinas_g: 0, carbohidratos_g: 0, grasas_g: 0 }
+  return {
+    calorias: 0,
+    proteinas_g: 0,
+    carbohidratos_g: 0,
+    grasas_g: 0,
+  }
 }
 
-const dishesCache = new Map<string, SavedDish[]>()
-const dishesLoading = new Map<string, Promise<SavedDish[]>>()
+/**
+ * ============================================================
+ * CACHE LOCAL
+ * ============================================================
+ *
+ * Los platos se guardan en localStorage por usuario.
+ *
+ * Esto significa que:
+ *
+ * Dashboard
+ *   ↓
+ * Cocina
+ *   ↓
+ * Mis platos
+ *
+ * no necesita volver a consultar Supabase cada vez.
+ *
+ * También funciona al minimizar/maximizar Safari en iPhone,
+ * siempre que el navegador conserve el almacenamiento de la web.
+ */
 
-async function getCachedDishes(userId: string): Promise<SavedDish[]> {
-  const cached = dishesCache.get(userId)
+function getStorageKey(userId: string) {
+  return `deficit_saved_dishes_${userId}`
+}
 
-  if (cached) {
-    return cached
+function readLocalDishes(userId: string): SavedDish[] | null {
+  if (typeof window === "undefined") return null
+
+  try {
+    const raw = localStorage.getItem(getStorageKey(userId))
+
+    if (!raw) return null
+
+    const parsed = JSON.parse(raw)
+
+    if (!Array.isArray(parsed)) {
+      return null
+    }
+
+    return parsed as SavedDish[]
+  } catch (error) {
+    console.error("dishes:localStorage read error", error)
+    return null
   }
+}
 
-  const existingRequest = dishesLoading.get(userId)
+function writeLocalDishes(userId: string, dishes: SavedDish[]) {
+  if (typeof window === "undefined") return
 
-  if (existingRequest) {
-    return existingRequest
+  try {
+    localStorage.setItem(
+      getStorageKey(userId),
+      JSON.stringify(dishes),
+    )
+  } catch (error) {
+    console.error("dishes:localStorage write error", error)
   }
-
-  const request = listDishes(userId).then((list) => {
-    dishesCache.set(userId, list)
-    dishesLoading.delete(userId)
-    return list
-  })
-
-  dishesLoading.set(userId, request)
-
-  return request
 }
 
 export function MisPlatosView({ onBack }: Props) {
   const { user } = useAuth()
+
   const [dishes, setDishes] = useState<SavedDish[]>([])
   const [loadingList, setLoadingList] = useState(true)
 
   const [editingId, setEditingId] = useState<string | null>(null)
   const [showForm, setShowForm] = useState(false)
+
   const [nombre, setNombre] = useState("")
-  const [ingredientes, setIngredientes] = useState<IngredientDraft[]>([emptyIngredient()])
+  const [ingredientes, setIngredientes] = useState<IngredientDraft[]>([
+    emptyIngredient(),
+  ])
   const [instrucciones, setInstrucciones] = useState("")
   const [macros, setMacros] = useState(emptyMacros())
   const [analyzed, setAnalyzed] = useState(false)
@@ -75,31 +138,52 @@ export function MisPlatosView({ onBack }: Props) {
   const [saving, setSaving] = useState(false)
   const [deletingId, setDeletingId] = useState<string | null>(null)
 
+  /**
+   * ============================================================
+   * CARGA INICIAL
+   * ============================================================
+   *
+   * Primero buscamos localStorage.
+   *
+   * Si existe:
+   *   → mostramos los platos inmediatamente
+   *   → NO hacemos llamada a Supabase
+   *
+   * Si no existe:
+   *   → hacemos una única llamada a Supabase
+   *   → guardamos el resultado en localStorage
+   */
+
   useEffect(() => {
     let cancelled = false
 
     async function load() {
       if (!user) {
+        setDishes([])
         setLoadingList(false)
         return
       }
 
-      const cached = dishesCache.get(user.id)
+      const localDishes = readLocalDishes(user.id)
 
-      if (cached) {
-        setDishes(cached)
-        setLoadingList(false)
+      if (localDishes !== null) {
+        if (!cancelled) {
+          setDishes(localDishes)
+          setLoadingList(false)
+        }
+
         return
       }
 
       setLoadingList(true)
 
-      const list = await getCachedDishes(user.id)
+      const remoteDishes = await listDishes(user.id)
 
-      if (!cancelled) {
-        setDishes(list)
-        setLoadingList(false)
-      }
+      if (cancelled) return
+
+      setDishes(remoteDishes)
+      writeLocalDishes(user.id, remoteDishes)
+      setLoadingList(false)
     }
 
     load()
@@ -109,9 +193,16 @@ export function MisPlatosView({ onBack }: Props) {
     }
   }, [user?.id])
 
-  function updateDishesCache(userId: string, next: SavedDish[]) {
-    dishesCache.set(userId, next)
+  /**
+   * Mantiene Supabase + localStorage sincronizados
+   * después de cualquier cambio.
+   */
+
+  function updateLocalDishes(next: SavedDish[]) {
+    if (!user) return
+
     setDishes(next)
+    writeLocalDishes(user.id, next)
   }
 
   function resetForm() {
@@ -132,6 +223,7 @@ export function MisPlatosView({ onBack }: Props) {
   function openEdit(dish: SavedDish) {
     setEditingId(dish.id)
     setNombre(dish.nombre)
+
     setIngredientes(
       dish.ingredientes.length > 0
         ? dish.ingredientes.map((i) => ({
@@ -141,33 +233,53 @@ export function MisPlatosView({ onBack }: Props) {
           }))
         : [emptyIngredient()],
     )
+
     setInstrucciones(dish.instrucciones ?? "")
+
     setMacros({
       calorias: dish.calorias,
       proteinas_g: dish.proteinas_g,
       carbohidratos_g: dish.carbohidratos_g,
       grasas_g: dish.grasas_g,
     })
+
     setAnalyzed(true)
     setAnalyzeError(null)
     setShowForm(true)
   }
 
-  function updateIngredient(index: number, patch: Partial<IngredientDraft>) {
+  function updateIngredient(
+    index: number,
+    patch: Partial<IngredientDraft>,
+  ) {
     setIngredientes((prev) =>
-      prev.map((ing, i) => (i === index ? { ...ing, ...patch } : ing)),
+      prev.map((ing, i) =>
+        i === index
+          ? {
+              ...ing,
+              ...patch,
+            }
+          : ing,
+      ),
     )
+
     setAnalyzed(false)
   }
 
   function addIngredientRow() {
-    setIngredientes((prev) => [...prev, emptyIngredient()])
+    setIngredientes((prev) => [
+      ...prev,
+      emptyIngredient(),
+    ])
   }
 
   function removeIngredientRow(index: number) {
     setIngredientes((prev) =>
-      prev.length > 1 ? prev.filter((_, i) => i !== index) : prev,
+      prev.length > 1
+        ? prev.filter((_, i) => i !== index)
+        : prev,
     )
+
     setAnalyzed(false)
   }
 
@@ -176,7 +288,8 @@ export function MisPlatosView({ onBack }: Props) {
   )
 
   const canAnalyze =
-    nombre.trim().length > 0 && validIngredients.length > 0
+    nombre.trim().length > 0 &&
+    validIngredients.length > 0
 
   async function handleAnalyze() {
     if (!canAnalyze) return
@@ -185,11 +298,15 @@ export function MisPlatosView({ onBack }: Props) {
     setAnalyzeError(null)
 
     try {
-      const { data: sessionData } = await supabase.auth.getSession()
+      const { data: sessionData } =
+        await supabase.auth.getSession()
+
       const session = sessionData.session
 
       if (!session) {
-        throw new Error("Inicia sesión para usar el análisis con IA")
+        throw new Error(
+          "Inicia sesión para usar el análisis con IA",
+        )
       }
 
       const descripcion = `${nombre.trim()}: ${validIngredients
@@ -214,22 +331,34 @@ export function MisPlatosView({ onBack }: Props) {
       const data = await res.json()
 
       if (!res.ok) {
-        throw new Error(data?.error || "Error al analizar el plato")
+        throw new Error(
+          data?.error || "Error al analizar el plato",
+        )
       }
 
       const analysis = data as FoodAnalysis
 
       setMacros({
-        calorias: Math.round(analysis.calorias_totales),
-        proteinas_g: Math.round(analysis.proteinas_g),
-        carbohidratos_g: Math.round(analysis.carbohidratos_g),
-        grasas_g: Math.round(analysis.grasas_g),
+        calorias: Math.round(
+          analysis.calorias_totales,
+        ),
+        proteinas_g: Math.round(
+          analysis.proteinas_g,
+        ),
+        carbohidratos_g: Math.round(
+          analysis.carbohidratos_g,
+        ),
+        grasas_g: Math.round(
+          analysis.grasas_g,
+        ),
       })
 
       setAnalyzed(true)
     } catch (e) {
       setAnalyzeError(
-        e instanceof Error ? e.message : "Error al analizar el plato",
+        e instanceof Error
+          ? e.message
+          : "Error al analizar el plato",
       )
     } finally {
       setAnalyzing(false)
@@ -242,17 +371,23 @@ export function MisPlatosView({ onBack }: Props) {
     setSaving(true)
 
     try {
-      const ingredientesFinal: DishIngredient[] = validIngredients.map((i) => ({
-        nombre: i.nombre.trim(),
-        cantidad: Number(i.cantidad) || 0,
-        unidad: i.unidad || "g",
-      }))
+      const ingredientesFinal: DishIngredient[] =
+        validIngredients.map((i) => ({
+          nombre: i.nombre.trim(),
+          cantidad: Number(i.cantidad) || 0,
+          unidad: i.unidad || "g",
+        }))
+
+      /**
+       * EDITAR
+       */
 
       if (editingId) {
         const ok = await updateDish(editingId, {
           nombre: nombre.trim(),
           ingredientes: ingredientesFinal,
-          instrucciones: instrucciones.trim() || undefined,
+          instrucciones:
+            instrucciones.trim() || undefined,
           ...macros,
         })
 
@@ -263,26 +398,37 @@ export function MisPlatosView({ onBack }: Props) {
                   ...dish,
                   nombre: nombre.trim(),
                   ingredientes: ingredientesFinal,
-                  instrucciones: instrucciones.trim() || undefined,
+                  instrucciones:
+                    instrucciones.trim() ||
+                    undefined,
                   ...macros,
                 }
               : dish,
           )
 
-          updateDishesCache(user.id, next)
+          updateLocalDishes(next)
         }
       } else {
+        /**
+         * CREAR
+         */
+
         const created = await createDish(user.id, {
           nombre: nombre.trim(),
           ingredientes: ingredientesFinal,
-          instrucciones: instrucciones.trim() || undefined,
+          instrucciones:
+            instrucciones.trim() || undefined,
           origen: "manual",
           ...macros,
         })
 
         if (created) {
-          const next = [created, ...dishes]
-          updateDishesCache(user.id, next)
+          const next = [
+            created,
+            ...dishes,
+          ]
+
+          updateLocalDishes(next)
         }
       }
 
@@ -304,13 +450,22 @@ export function MisPlatosView({ onBack }: Props) {
 
     const success = await deleteDish(dish.id)
 
-    if (success && user) {
-      const next = dishes.filter((d) => d.id !== dish.id)
-      updateDishesCache(user.id, next)
+    if (success) {
+      const next = dishes.filter(
+        (d) => d.id !== dish.id,
+      )
+
+      updateLocalDishes(next)
     }
 
     setDeletingId(null)
   }
+
+  /**
+   * ============================================================
+   * FORMULARIO
+   * ============================================================
+   */
 
   if (showForm) {
     return (
@@ -328,7 +483,9 @@ export function MisPlatosView({ onBack }: Props) {
           </button>
 
           <h1 className="text-lg font-bold">
-            {editingId ? "Editar plato" : "Nuevo plato"}
+            {editingId
+              ? "Editar plato"
+              : "Nuevo plato"}
           </h1>
 
           <div className="w-16" />
@@ -357,11 +514,16 @@ export function MisPlatosView({ onBack }: Props) {
             </Label>
 
             {ingredientes.map((ing, i) => (
-              <div key={i} className="flex items-center gap-2">
+              <div
+                key={i}
+                className="flex items-center gap-2"
+              >
                 <Input
                   value={ing.nombre}
                   onChange={(e) =>
-                    updateIngredient(i, { nombre: e.target.value })
+                    updateIngredient(i, {
+                      nombre: e.target.value,
+                    })
                   }
                   placeholder="Ingrediente"
                   className="h-11 flex-1"
@@ -372,7 +534,9 @@ export function MisPlatosView({ onBack }: Props) {
                   inputMode="numeric"
                   value={ing.cantidad}
                   onChange={(e) =>
-                    updateIngredient(i, { cantidad: e.target.value })
+                    updateIngredient(i, {
+                      cantidad: e.target.value,
+                    })
                   }
                   placeholder="0"
                   className="h-11 w-20 tabular-nums"
@@ -384,7 +548,9 @@ export function MisPlatosView({ onBack }: Props) {
 
                 <button
                   type="button"
-                  onClick={() => removeIngredientRow(i)}
+                  onClick={() =>
+                    removeIngredientRow(i)
+                  }
                   className="shrink-0 text-muted-foreground hover:text-destructive"
                   aria-label="Quitar ingrediente"
                 >
@@ -410,7 +576,9 @@ export function MisPlatosView({ onBack }: Props) {
 
             <textarea
               value={instrucciones}
-              onChange={(e) => setInstrucciones(e.target.value)}
+              onChange={(e) =>
+                setInstrucciones(e.target.value)
+              }
               placeholder="Pasos para prepararlo..."
               rows={3}
               className="w-full resize-none rounded-xl border border-input bg-transparent px-3 py-2.5 text-sm outline-none placeholder:text-muted-foreground focus:ring-2 focus:ring-ring"
@@ -428,7 +596,9 @@ export function MisPlatosView({ onBack }: Props) {
               <Sparkles className="size-4" />
             )}
 
-            {analyzing ? "Analizando..." : "Analizar con IA"}
+            {analyzing
+              ? "Analizando..."
+              : "Analizar con IA"}
           </Button>
 
           {analyzeError && (
@@ -440,8 +610,14 @@ export function MisPlatosView({ onBack }: Props) {
 
           {analyzed && (
             <motion.div
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
+              initial={{
+                opacity: 0,
+                y: 8,
+              }}
+              animate={{
+                opacity: 1,
+                y: 0,
+              }}
               className="rounded-xl bg-muted/50 p-4"
             >
               <p className="mb-2 text-xs font-medium text-muted-foreground">
@@ -453,28 +629,36 @@ export function MisPlatosView({ onBack }: Props) {
                   <p className="font-bold tabular-nums text-food">
                     {macros.calorias}
                   </p>
-                  <p className="text-muted-foreground">kcal</p>
+                  <p className="text-muted-foreground">
+                    kcal
+                  </p>
                 </div>
 
                 <div>
                   <p className="font-bold tabular-nums">
                     {macros.proteinas_g}g
                   </p>
-                  <p className="text-muted-foreground">Prot</p>
+                  <p className="text-muted-foreground">
+                    Prot
+                  </p>
                 </div>
 
                 <div>
                   <p className="font-bold tabular-nums">
                     {macros.carbohidratos_g}g
                   </p>
-                  <p className="text-muted-foreground">Carb</p>
+                  <p className="text-muted-foreground">
+                    Carb
+                  </p>
                 </div>
 
                 <div>
                   <p className="font-bold tabular-nums">
                     {macros.grasas_g}g
                   </p>
-                  <p className="text-muted-foreground">Gras</p>
+                  <p className="text-muted-foreground">
+                    Gras
+                  </p>
                 </div>
               </div>
             </motion.div>
@@ -491,12 +675,20 @@ export function MisPlatosView({ onBack }: Props) {
               <Check className="size-4" />
             )}
 
-            {saving ? "Guardando..." : "Guardar plato"}
+            {saving
+              ? "Guardando..."
+              : "Guardar plato"}
           </Button>
         </Card>
       </div>
     )
   }
+
+  /**
+   * ============================================================
+   * LISTA
+   * ============================================================
+   */
 
   return (
     <div className="flex flex-col gap-5 px-4 pb-4 pt-8">
@@ -512,14 +704,20 @@ export function MisPlatosView({ onBack }: Props) {
 
       <header className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Mis platos</h1>
+          <h1 className="text-2xl font-bold tracking-tight">
+            Mis platos
+          </h1>
+
           <p className="text-sm text-muted-foreground">
             Tus recetas guardadas, listas para reutilizar
           </p>
         </div>
       </header>
 
-      <Button className="h-12 w-full gap-2" onClick={openCreate}>
+      <Button
+        className="h-12 w-full gap-2"
+        onClick={openCreate}
+      >
         <Plus className="size-4" />
         Crear plato
       </Button>
@@ -534,6 +732,7 @@ export function MisPlatosView({ onBack }: Props) {
       {!loadingList && dishes.length === 0 && (
         <Card className="items-center gap-1 py-10 text-center">
           <BookOpen className="size-6 text-muted-foreground" />
+
           <p className="text-sm text-muted-foreground">
             Aún no has guardado ningún plato
           </p>
@@ -547,7 +746,9 @@ export function MisPlatosView({ onBack }: Props) {
               <div className="flex items-start justify-between gap-2">
                 <button
                   type="button"
-                  onClick={() => openEdit(dish)}
+                  onClick={() =>
+                    openEdit(dish)
+                  }
                   className="min-w-0 flex-1 text-left"
                 >
                   <p className="truncate text-sm font-semibold">
@@ -555,15 +756,21 @@ export function MisPlatosView({ onBack }: Props) {
                   </p>
 
                   <p className="text-xs text-muted-foreground">
-                    {dish.calorias} kcal · P{dish.proteinas_g} C
-                    {dish.carbohidratos_g} G{dish.grasas_g}
+                    {dish.calorias} kcal · P
+                    {dish.proteinas_g} C
+                    {dish.carbohidratos_g} G
+                    {dish.grasas_g}
                   </p>
                 </button>
 
                 <button
                   type="button"
-                  onClick={() => handleDelete(dish)}
-                  disabled={deletingId === dish.id}
+                  onClick={() =>
+                    handleDelete(dish)
+                  }
+                  disabled={
+                    deletingId === dish.id
+                  }
                   className="shrink-0 text-muted-foreground hover:text-destructive disabled:opacity-50"
                   aria-label="Eliminar plato"
                 >
