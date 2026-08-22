@@ -97,3 +97,27 @@ export interface SavedDish {
   origen: DishOrigin
   created_at: string
 }
+
+export type CookingCategory = "desayuno" | "almuerzo" | "postre" | "cena"
+export type Dificultad = "facil" | "media" | "dificil"
+
+export interface CookingRecipe {
+  id: string
+  categoria: CookingCategory
+  nombre: string
+  ingredientes: DishIngredient[]
+  calorias: number
+  proteinas_g: number
+  carbohidratos_g: number
+  grasas_g: number
+  instrucciones: string
+  tiempo_preparacion_min: number
+  dificultad: Dificultad
+  /** Palabra clave usada para elegir una imagen genérica, ej. "pollo", "ensalada", "pasta". */
+  imagen_query: string
+}
+
+export interface CookingRecommendationsData {
+  recipes: CookingRecipe[]
+  generated_at: string
+}

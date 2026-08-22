@@ -4,6 +4,7 @@ import { useState } from "react"
 import { ChefHat, BookOpen, Sparkles, Soup, ChevronRight } from "lucide-react"
 import { Card } from "@/components/ui/card"
 import { MisPlatosView } from "@/components/views/mis-platos-view"
+import { RecomendadosView } from "@/components/views/recomendados-view"
 
 type CocinaSection = "menu" | "mis-platos" | "recomendados" | "que-cocinar"
 
@@ -44,6 +45,10 @@ export function CocinaView() {
 
   if (section === "mis-platos") {
     return <MisPlatosView onBack={() => setSection("menu")} />
+  }
+
+  if (section === "recomendados") {
+    return <RecomendadosView onBack={() => setSection("menu")} />
   }
 
   if (section !== "menu") {
