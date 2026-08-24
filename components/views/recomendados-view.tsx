@@ -58,7 +58,6 @@ export function RecomendadosView({ onBack }: Props) {
         if (!res.ok) throw new Error(data?.error || "Error al cargar recomendaciones")
 
         if (!data.recommendations || data.recommendations.expired || data.recommendations.recipes.length === 0) {
-          // No hay ciclo vigente: generamos uno nuevo (solo la primera vez o al caducar)
           const genRes = await authedFetch("/api/cooking-recommendations", "POST")
           const genData = await genRes.json()
           if (!genRes.ok) throw new Error(genData?.error || "Error al generar recomendaciones")
@@ -112,6 +111,8 @@ export function RecomendadosView({ onBack }: Props) {
   if (detail) {
     const fit = computeMacroFit(detail, remaining)
     const alreadySaved = savedIds.has(detail.id)
+    const detailIndex = categoryRecipes.indexOf(detail)
+
     return (
       <div className="flex flex-col gap-5 px-4 pb-4 pt-8">
         <button type="button" onClick={() => setDetail(null)} className="self-start text-sm font-medium text-muted-foreground">
@@ -119,8 +120,8 @@ export function RecomendadosView({ onBack }: Props) {
         </button>
 
         <img
-          src={getGenericImage(detail.categoria, recipes.filter((r) => r.categoria === detail.categoria).indexOf(detail))}
-          alt=""
+          src={getGenericImage(detail, detailIndex >= 0 ? detailIndex : 0)}
+          alt={detail.nombre}
           className="h-48 w-full rounded-2xl object-cover"
         />
 
@@ -247,8 +248,8 @@ export function RecomendadosView({ onBack }: Props) {
                 <button type="button" onClick={() => setDetail(recipe)} className="w-full text-left">
                   <Card className="flex-row items-center gap-3 p-3">
                     <img
-                      src={getGenericImage(recipe.categoria, i)}
-                      alt=""
+                      src={getGenericImage(recipe, i)}
+                      alt={recipe.nombre}
                       className="size-16 shrink-0 rounded-xl object-cover"
                     />
                     <div className="min-w-0 flex-1">

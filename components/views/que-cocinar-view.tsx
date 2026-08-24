@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label"
 import { useAuth } from "@/hooks/use-auth"
 import { useTracker } from "@/hooks/use-tracker"
 import supabase from "@/lib/supabaseClient"
-import { getGenericGeneralImage } from "@/lib/dish-images"
+import { getGenericImage } from "@/lib/dish-images"
 import { getRemainingMacros } from "@/lib/macroFit"
 import { createDish } from "@/lib/dishes"
 import type { WhatToCookRecipe } from "@/lib/geminiWhatToCook"
@@ -147,8 +147,8 @@ export function QueCocinarView({ onBack }: Props) {
             return (
               <Card key={recipe.id} className="gap-3 px-4">
                 <img
-                  src={getGenericGeneralImage(i)}
-                  alt=""
+                  src={getGenericImage({ nombre: recipe.nombre, categoria: "almuerzo" }, i)}
+                  alt={recipe.nombre}
                   className="h-36 w-full rounded-xl object-cover"
                 />
 
