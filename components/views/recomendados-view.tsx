@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button"
 import { useAuth } from "@/hooks/use-auth"
 import { useTracker } from "@/hooks/use-tracker"
 import supabase from "@/lib/supabaseClient"
-import { getGenericImage } from "@/lib/dish-images"
+import { getGenericImage, DEFAULT_FOOD_IMAGE } from "@/lib/dish-images"
 import { getRemainingMacros, computeMacroFit } from "@/lib/macroFit"
 import { createDish } from "@/lib/dishes"
 import type { CookingCategory, CookingRecipe } from "@/lib/types"
@@ -122,6 +122,9 @@ export function RecomendadosView({ onBack }: Props) {
         <img
           src={getGenericImage(detail, detailIndex >= 0 ? detailIndex : 0)}
           alt={detail.nombre}
+          onError={(e) => {
+            e.currentTarget.src = DEFAULT_FOOD_IMAGE
+          }}
           className="h-48 w-full rounded-2xl object-cover"
         />
 
@@ -250,6 +253,9 @@ export function RecomendadosView({ onBack }: Props) {
                     <img
                       src={getGenericImage(recipe, i)}
                       alt={recipe.nombre}
+                      onError={(e) => {
+                        e.currentTarget.src = DEFAULT_FOOD_IMAGE
+                      }}
                       className="size-16 shrink-0 rounded-xl object-cover"
                     />
                     <div className="min-w-0 flex-1">
