@@ -6,7 +6,8 @@ import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { useAuth } from "@/hooks/use-auth"
 import { getGenericImage } from "@/lib/dish-images"
-import { deleteDish, getDishes, type Dish } from "@/lib/dishes"
+import { listDishes, deleteDish } from "@/lib/dishes"
+import type { SavedDish } from "@/lib/types"
 
 interface Props {
   onBack: () => void
@@ -15,11 +16,11 @@ interface Props {
 
 export function MisPlatosView({ onBack, onNavigateToCreate }: Props) {
   const { user } = useAuth()
-  const [dishes, setDishes] = useState<Dish[]>([])
+  const [dishes, setDishes] = useState<SavedDish[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [search, setSearch] = useState("")
-  const [selectedDish, setSelectedDish] = useState<Dish | null>(null)
+  const [selectedDish, setSelectedDish] = useState<SavedDish | null>(null)
   const [deletingId, setDeletingId] = useState<string | null>(null)
 
   useEffect(() => {
@@ -28,7 +29,7 @@ export function MisPlatosView({ onBack, onNavigateToCreate }: Props) {
       setLoading(true)
       setError(null)
       try {
-        const data = await getDishes(user.id)
+        const data = await listDishes(user.id)
         setDishes(data)
       } catch (e) {
         setError(e instanceof Error ? e.message : "Error al cargar mis platos")
@@ -44,9 +45,8 @@ export function MisPlatosView({ onBack, onNavigateToCreate }: Props) {
   }, [dishes, search])
 
   async function handleDelete(id: string) {
-    if (!user) return
     setDeletingId(id)
-    const success = await deleteDish(user.id, id)
+    const success = await deleteDish(id)
     if (success) {
       setDishes((prev) => prev.filter((d) => d.id !== id))
       if (selectedDish?.id === id) setSelectedDish(null)
