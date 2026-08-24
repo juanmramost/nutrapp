@@ -45,3 +45,16 @@ export function getGenericImage(categoria: CookingCategory, indexInCategory: num
   const pool = IMAGES_BY_CATEGORY[categoria]
   return pool[indexInCategory % pool.length]
 }
+
+/** Pool genérico para recetas sin categoría fija (usado en "¿Qué puedo cocinar?"). */
+const GENERAL_IMAGES = [
+  "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=500&q=60",
+  "https://images.unsplash.com/photo-1512621776951-a57141f2eefd?w=500&q=60",
+  "https://images.unsplash.com/photo-1512058564366-18510be2db19?w=500&q=60",
+  "https://images.unsplash.com/photo-1467003909585-2f8a72700288?w=500&q=60",
+  "https://images.unsplash.com/photo-1543339308-43e59d6b73a6?w=500&q=60",
+]
+
+export function getGenericGeneralImage(index: number): string {
+  return GENERAL_IMAGES[index % GENERAL_IMAGES.length]
+}
