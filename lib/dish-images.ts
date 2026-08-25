@@ -1,10 +1,27 @@
+import type { CookingCategory } from "@/lib/types"
+
 export const DEFAULT_FOOD_IMAGE =
   "https://images.unsplash.com/photo-1498837167922-ddd27525d352?w=800&auto=format&fit=crop&q=80"
 
-const IMAGE_BANK: { keywords: string[]; urls: string[] }[] = [
+interface ImageBankEntry {
+  keywords: string[]
+  urls: string[]
+  /**
+   * Tipos de comida donde esta categoría es especialmente probable.
+   * Se usa como desempate cuando un plato matchea keywords de varias
+   * categorías a la vez (ej. "tortilla de patatas" -> huevos vs patatas).
+   */
+  mealTypes?: CookingCategory[]
+}
+
+// NOTA: se eliminaron URLs duplicadas que aparecían en categorías sin
+// relación (p.ej. la misma foto de carne en "Ternera" y "Cerdo"), para
+// que platos distintos no compartan la misma imagen.
+const IMAGE_BANK: ImageBankEntry[] = [
   // 1. Batidos, Smoothies y Proteínas
   {
     keywords: ["batido", "smoothie", "licuado", "shake", "proteico", "proteina", "verde", "zumo", "jugo", "whey"],
+    mealTypes: ["desayuno"],
     urls: [
       "https://images.unsplash.com/photo-1553530666-ba11a7da3888?w=800&auto=format&fit=crop&q=80",
       "https://images.unsplash.com/photo-1532712938310-34cb3982ef74?w=800&auto=format&fit=crop&q=80",
@@ -14,6 +31,7 @@ const IMAGE_BANK: { keywords: string[]; urls: string[] }[] = [
   // 2. Avena, Gachas, Porridge y Granola
   {
     keywords: ["avena", "gachas", "porridge", "oatmeal", "granola", "muesli", "cereales", "chia"],
+    mealTypes: ["desayuno"],
     urls: [
       "https://images.unsplash.com/photo-1517673400267-0251440c45dc?w=800&auto=format&fit=crop&q=80",
       "https://images.unsplash.com/photo-1584776296944-ab6fb57b0bdd?w=800&auto=format&fit=crop&q=80",
@@ -23,15 +41,16 @@ const IMAGE_BANK: { keywords: string[]; urls: string[] }[] = [
   // 3. Tortitas, Pancakes, Crepes y Gofres
   {
     keywords: ["pancake", "pancakes", "tortita", "tortitas", "crepe", "crepes", "waffle", "waffles", "gofre", "gofres"],
+    mealTypes: ["desayuno"],
     urls: [
       "https://images.unsplash.com/photo-1565299585323-38d6b0865b47?w=800&auto=format&fit=crop&q=80",
       "https://images.unsplash.com/photo-1528207776546-365bb710ee93?w=800&auto=format&fit=crop&q=80",
-      "https://images.unsplash.com/photo-1509440159596-0249088772ff?w=800&auto=format&fit=crop&q=80",
     ],
   },
   // 4. Yogur, Queso Fresco, Kéfir y Bowls
   {
     keywords: ["yogur", "yogurt", "kefir", "cuajada", "requeson", "cottage", "skyr", "queso fresco", "arandanos", "berries", "fresa", "frambuesa"],
+    mealTypes: ["desayuno"],
     urls: [
       "https://images.unsplash.com/photo-1488477181946-6428a0291777?w=800&auto=format&fit=crop&q=80",
       "https://images.unsplash.com/photo-1511690656952-34342bb7c2f2?w=800&auto=format&fit=crop&q=80",
@@ -40,6 +59,7 @@ const IMAGE_BANK: { keywords: string[]; urls: string[] }[] = [
   // 5. Tostadas y Panes Integrales
   {
     keywords: ["tostada", "tostadas", "pan", "centeno", "integral", "toast", "bagel", "mollete"],
+    mealTypes: ["desayuno"],
     urls: [
       "https://images.unsplash.com/photo-1588137378633-dea1336ce1e2?w=800&auto=format&fit=crop&q=80",
       "https://images.unsplash.com/photo-1525351484163-7529414344d8?w=800&auto=format&fit=crop&q=80",
@@ -56,9 +76,8 @@ const IMAGE_BANK: { keywords: string[]; urls: string[] }[] = [
   // 7. Huevos y Tortillas
   {
     keywords: ["tortilla", "huevo", "huevos", "revoltijo", "revuelto", "scramble", "omelette", "poche", "escalfado", "frito", "claras"],
+    mealTypes: ["desayuno"],
     urls: [
-      "https://images.unsplash.com/photo-1525351484163-7529414344d8?w=800&auto=format&fit=crop&q=80",
-      "https://images.unsplash.com/photo-1565299585323-38d6b0865b47?w=800&auto=format&fit=crop&q=80",
       "https://images.unsplash.com/photo-1510693206972-df098062cb71?w=800&auto=format&fit=crop&q=80",
     ],
   },
@@ -91,7 +110,6 @@ const IMAGE_BANK: { keywords: string[]; urls: string[] }[] = [
   {
     keywords: ["cerdo", "pork", "secreto", "presa", "costillas", "bacon", "beicon", "jamon", "lomo embuchado"],
     urls: [
-      "https://images.unsplash.com/photo-1544025162-d76694265947?w=800&auto=format&fit=crop&q=80",
       "https://images.unsplash.com/photo-1529692236671-f1f6cf9683ba?w=800&auto=format&fit=crop&q=80",
     ],
   },
@@ -116,7 +134,6 @@ const IMAGE_BANK: { keywords: string[]; urls: string[] }[] = [
     keywords: ["salmon", "atun", "bonito", "sardina", "sardinas", "caballa", "boquerones", "anchovas", "anchoas", "tuna"],
     urls: [
       "https://images.unsplash.com/photo-1467003909585-2f8a72700288?w=800&auto=format&fit=crop&q=80",
-      "https://images.unsplash.com/photo-1519708227418-c8fd9a32b7a2?w=800&auto=format&fit=crop&q=80",
     ],
   },
   // 15. Mariscos
@@ -132,7 +149,6 @@ const IMAGE_BANK: { keywords: string[]; urls: string[] }[] = [
     keywords: ["arroz", "rice", "poke", "bowl", "risotto", "paella", "quinoa", "cuscus", "couscous", "basmati", "integral"],
     urls: [
       "https://images.unsplash.com/photo-1512058564366-18510be2db19?w=800&auto=format&fit=crop&q=80",
-      "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=800&auto=format&fit=crop&q=80",
       "https://images.unsplash.com/photo-1543339308-43e59d6b73a6?w=800&auto=format&fit=crop&q=80",
     ],
   },
@@ -165,7 +181,6 @@ const IMAGE_BANK: { keywords: string[]; urls: string[] }[] = [
   {
     keywords: ["taco", "tacos", "quesadilla", "quesadillas", "nachos", "guacamole", "totopos"],
     urls: [
-      "https://images.unsplash.com/photo-1565299585323-38d6b0865b47?w=800&auto=format&fit=crop&q=80",
       "https://images.unsplash.com/photo-1551504734-5ee1c4a1479b?w=800&auto=format&fit=crop&q=80",
     ],
   },
@@ -181,7 +196,6 @@ const IMAGE_BANK: { keywords: string[]; urls: string[] }[] = [
   {
     keywords: ["ensalada", "salad", "cesar", "mediterranea", "canonigos", "rucula", "cogollos"],
     urls: [
-      "https://images.unsplash.com/photo-1512621776951-a57141f2eefd?w=800&auto=format&fit=crop&q=80",
       "https://images.unsplash.com/photo-1540420773420-3366772f4999?w=800&auto=format&fit=crop&q=80",
     ],
   },
@@ -206,7 +220,6 @@ const IMAGE_BANK: { keywords: string[]; urls: string[] }[] = [
     keywords: ["verdura", "verduras", "espinacas", "brocoli", "calabacin", "berenjena", "esparragos", "esparrago", "pimiento", "pimientos", "tomate", "salteado", "menestra", "escalivada", "parrillada"],
     urls: [
       "https://images.unsplash.com/photo-1592417817098-8f3d6eb19657?w=800&auto=format&fit=crop&q=80",
-      "https://images.unsplash.com/photo-1540420773420-3366772f4999?w=800&auto=format&fit=crop&q=80",
     ],
   },
   // 26. Guisos y Platos Tradicionales
@@ -214,7 +227,6 @@ const IMAGE_BANK: { keywords: string[]; urls: string[] }[] = [
     keywords: ["estofado", "guiso", "cocido", "fabada", "potaje", "marmitako", "cazuela", "rabo de toro", "carrilleras", "puchero"],
     urls: [
       "https://images.unsplash.com/photo-1547592166-23ac45744acd?w=800&auto=format&fit=crop&q=80",
-      "https://images.unsplash.com/photo-1538332576228-eb5b4c4de6f5?w=800&auto=format&fit=crop&q=80",
     ],
   },
   // 27. Frutos Secos y Snacks
@@ -228,6 +240,7 @@ const IMAGE_BANK: { keywords: string[]; urls: string[] }[] = [
   // 28. Postres Fit, Repostería y Dulces
   {
     keywords: ["tarta", "cheesecake", "brownie", "chocolate", "mousse", "galleta", "galletas", "cookie", "cookies", "bizcocho", "dulce", "postre", "flan", "natillas", "muffin", "cupcake"],
+    mealTypes: ["postre"],
     urls: [
       "https://images.unsplash.com/photo-1508737027454-e6454ef46afd?w=800&auto=format&fit=crop&q=80",
       "https://images.unsplash.com/photo-1606313564200-e75d5e30476c?w=800&auto=format&fit=crop&q=80",
@@ -236,6 +249,7 @@ const IMAGE_BANK: { keywords: string[]; urls: string[] }[] = [
   // 29. Fruta Fresca
   {
     keywords: ["manzana", "platano", "banana", "naranja", "kiwi", "mango", "pina", "piña", "sandia", "melon", "melocoton", "albaricoque", "uvas", "higos", "fruta", "frutas"],
+    mealTypes: ["postre", "desayuno"],
     urls: [
       "https://images.unsplash.com/photo-1619566636858-adf3ef46400b?w=800&auto=format&fit=crop&q=80",
       "https://images.unsplash.com/photo-1490818387583-1baba5e638af?w=800&auto=format&fit=crop&q=80",
@@ -244,6 +258,7 @@ const IMAGE_BANK: { keywords: string[]; urls: string[] }[] = [
   // 30. Café, Té y Infusiones
   {
     keywords: ["cafe", "coffee", "cappuccino", "espresso", "latte", "te", "matcha", "infusion", "kombucha"],
+    mealTypes: ["desayuno"],
     urls: [
       "https://images.unsplash.com/photo-1514432324607-a09d9b4aefdd?w=800&auto=format&fit=crop&q=80",
       "https://images.unsplash.com/photo-1576092768241-dec231879fc3?w=800&auto=format&fit=crop&q=80",
@@ -251,21 +266,63 @@ const IMAGE_BANK: { keywords: string[]; urls: string[] }[] = [
   },
 ]
 
-export function getGenericImage(dish?: { nombre?: string; categoria?: string }, index = 0): string {
-  if (!dish?.nombre) return DEFAULT_FOOD_IMAGE
+// Cache de las regex por keyword para no recompilarlas en cada llamada.
+const keywordRegexCache = new Map<string, RegExp>()
 
-  const nameNormalized = dish.nombre
+function getKeywordRegex(keyword: string): RegExp {
+  let regex = keywordRegexCache.get(keyword)
+  if (!regex) {
+    const escaped = keyword.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+    // \b no funciona bien con espacios internos (keywords de 2 palabras
+    // como "queso fresco"), así que usamos límites manuales.
+    regex = new RegExp(`(?:^|[^a-z0-9])${escaped}(?:$|[^a-z0-9])`, "i")
+    keywordRegexCache.set(keyword, regex)
+  }
+  return regex
+}
+
+function normalize(text: string): string {
+  return text
     .toLowerCase()
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
+}
+
+export function getGenericImage(
+  dish?: { nombre?: string; categoria?: string },
+  index = 0
+): string {
+  if (!dish?.nombre) return DEFAULT_FOOD_IMAGE
+
+  // Espacio al inicio/fin para que la regex de límites detecte también
+  // coincidencias al borde del string.
+  const nameNormalized = ` ${normalize(dish.nombre)} `
+  const categoria = dish.categoria as CookingCategory | undefined
+
+  let bestEntry: ImageBankEntry | null = null
+  let bestScore = 0
 
   for (const entry of IMAGE_BANK) {
-    if (entry.keywords.some((kw) => nameNormalized.includes(kw))) {
-      return entry.urls[index % entry.urls.length]
+    let score = 0
+    for (const keyword of entry.keywords) {
+      if (getKeywordRegex(keyword).test(nameNormalized)) {
+        // Las keywords más largas (más específicas) pesan más, así
+        // "tortilla" (más específica del plato) gana a coincidencias
+        // genéricas cortas de otra categoría.
+        score += keyword.length
+      }
+    }
+    if (score > 0 && categoria && entry.mealTypes?.includes(categoria)) {
+      score += 5
+    }
+    if (score > bestScore) {
+      bestScore = score
+      bestEntry = entry
     }
   }
 
-  return DEFAULT_FOOD_IMAGE
+  if (!bestEntry) return DEFAULT_FOOD_IMAGE
+  return bestEntry.urls[index % bestEntry.urls.length]
 }
 
 export function getGenericGeneralImage(index = 0): string {

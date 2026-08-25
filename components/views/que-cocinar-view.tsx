@@ -5,10 +5,12 @@ import { Clock, Loader2, Sparkles, TriangleAlert } from "lucide-react"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
+import { DishImage } from "@/components/dish-image"
+import { MacroGrid } from "@/components/macro-grid"
 import { useAuth } from "@/hooks/use-auth"
 import { useTracker } from "@/hooks/use-tracker"
 import supabase from "@/lib/supabaseClient"
-import { getGenericImage, DEFAULT_FOOD_IMAGE } from "@/lib/dish-images"
+import { getGenericImage } from "@/lib/dish-images"
 import { getRemainingMacros } from "@/lib/macroFit"
 import { createDish } from "@/lib/dishes"
 import type { WhatToCookRecipe } from "@/lib/geminiWhatToCook"
@@ -146,12 +148,9 @@ export function QueCocinarView({ onBack }: Props) {
 
             return (
               <Card key={recipe.id} className="gap-3 px-4">
-                <img
+                <DishImage
                   src={getGenericImage(recipe, i)}
                   alt={recipe.nombre}
-                  onError={(e) => {
-                    e.currentTarget.src = DEFAULT_FOOD_IMAGE
-                  }}
                   className="h-36 w-full rounded-xl object-cover"
                 />
 
@@ -160,24 +159,12 @@ export function QueCocinarView({ onBack }: Props) {
                   <p className="text-xs font-medium text-muted-foreground">{fitLabel(recipe)}</p>
                 </div>
 
-                <div className="grid grid-cols-4 gap-2 rounded-xl bg-muted/50 p-3 text-center text-xs">
-                  <div>
-                    <p className="font-bold tabular-nums text-food">{recipe.calorias}</p>
-                    <p className="text-muted-foreground">kcal</p>
-                  </div>
-                  <div>
-                    <p className="font-bold tabular-nums">{recipe.proteinas_g}g</p>
-                    <p className="text-muted-foreground">Prot</p>
-                  </div>
-                  <div>
-                    <p className="font-bold tabular-nums">{recipe.carbohidratos_g}g</p>
-                    <p className="text-muted-foreground">Carb</p>
-                  </div>
-                  <div>
-                    <p className="font-bold tabular-nums">{recipe.grasas_g}g</p>
-                    <p className="text-muted-foreground">Gras</p>
-                  </div>
-                </div>
+                <MacroGrid
+                  kcal={recipe.calorias}
+                  proteinas={recipe.proteinas_g}
+                  carbohidratos={recipe.carbohidratos_g}
+                  grasas={recipe.grasas_g}
+                />
 
                 <p className="flex items-center gap-1 text-xs text-muted-foreground">
                   <Clock className="size-3.5" />

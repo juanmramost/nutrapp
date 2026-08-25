@@ -4,10 +4,12 @@ import { useEffect, useMemo, useState } from "react"
 import { Clock, Flame, Loader2, RefreshCw, TriangleAlert } from "lucide-react"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
+import { DishImage } from "@/components/dish-image"
+import { MacroGrid } from "@/components/macro-grid"
 import { useAuth } from "@/hooks/use-auth"
 import { useTracker } from "@/hooks/use-tracker"
 import supabase from "@/lib/supabaseClient"
-import { getGenericImage, DEFAULT_FOOD_IMAGE } from "@/lib/dish-images"
+import { getGenericImage } from "@/lib/dish-images"
 import { getRemainingMacros, computeMacroFit } from "@/lib/macroFit"
 import { createDish } from "@/lib/dishes"
 import type { CookingCategory, CookingRecipe } from "@/lib/types"
@@ -119,12 +121,9 @@ export function RecomendadosView({ onBack }: Props) {
           ← Volver
         </button>
 
-        <img
+        <DishImage
           src={getGenericImage(detail, detailIndex >= 0 ? detailIndex : 0)}
           alt={detail.nombre}
-          onError={(e) => {
-            e.currentTarget.src = DEFAULT_FOOD_IMAGE
-          }}
           className="h-48 w-full rounded-2xl object-cover"
         />
 
@@ -133,24 +132,13 @@ export function RecomendadosView({ onBack }: Props) {
           <p className="mt-1 text-xs font-medium text-muted-foreground">{fit.label}</p>
         </div>
 
-        <div className="grid grid-cols-4 gap-2 rounded-xl bg-muted/50 p-4 text-center text-xs">
-          <div>
-            <p className="font-bold tabular-nums text-food">{detail.calorias}</p>
-            <p className="text-muted-foreground">kcal</p>
-          </div>
-          <div>
-            <p className="font-bold tabular-nums">{detail.proteinas_g}g</p>
-            <p className="text-muted-foreground">Prot</p>
-          </div>
-          <div>
-            <p className="font-bold tabular-nums">{detail.carbohidratos_g}g</p>
-            <p className="text-muted-foreground">Carb</p>
-          </div>
-          <div>
-            <p className="font-bold tabular-nums">{detail.grasas_g}g</p>
-            <p className="text-muted-foreground">Gras</p>
-          </div>
-        </div>
+        <MacroGrid
+          kcal={detail.calorias}
+          proteinas={detail.proteinas_g}
+          carbohidratos={detail.carbohidratos_g}
+          grasas={detail.grasas_g}
+          className="p-4"
+        />
 
         <div className="flex items-center gap-4 text-xs text-muted-foreground">
           <span className="flex items-center gap-1">
@@ -250,12 +238,9 @@ export function RecomendadosView({ onBack }: Props) {
               <li key={recipe.id}>
                 <button type="button" onClick={() => setDetail(recipe)} className="w-full text-left">
                   <Card className="flex-row items-center gap-3 p-3">
-                    <img
+                    <DishImage
                       src={getGenericImage(recipe, i)}
                       alt={recipe.nombre}
-                      onError={(e) => {
-                        e.currentTarget.src = DEFAULT_FOOD_IMAGE
-                      }}
                       className="size-16 shrink-0 rounded-xl object-cover"
                     />
                     <div className="min-w-0 flex-1">
