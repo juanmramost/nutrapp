@@ -80,7 +80,7 @@ export function RecomendadosView({ onBack }: Props) {
   const [loading, setLoading] = useState(true)
   const [regenerating, setRegenerating] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [detail, setDetail] = useState<CookingRecipe | null>(null)
+  const [detailId, setDetailId] = useState<string | null>(null)
   const [savingId, setSavingId] = useState<string | null>(null)
   const [savedIds, setSavedIds] = useState<Set<string>>(new Set())
 
@@ -134,8 +134,21 @@ export function RecomendadosView({ onBack }: Props) {
       })
     }
 
+    // Si el navegador restaura la página desde bfcache (atrás/adelante),
+    // el DOM congelado puede mostrar un frame viejo por un instante.
+    // Forzamos una recarga de los datos para evitar ver contenido desactualizado.
+    const handlePageShow = (event: PageTransitionEvent) => {
+      if (event.persisted) {
+        load()
+      }
+    }
+
     window.addEventListener("pagehide", handlePageHide)
-    return () => window.removeEventListener("pagehide", handlePageHide)
+    window.addEventListener("pageshow", handlePageShow)
+    return () => {
+      window.removeEventListener("pagehide", handlePageHide)
+      window.removeEventListener("pageshow", handlePageShow)
+    }
   }, [user])
 
   async function handleRegenerate() {
@@ -173,6 +186,11 @@ export function RecomendadosView({ onBack }: Props) {
   }
 
   const categoryRecipes = recipes.filter((r) => r.categoria === category)
+  // Derivar siempre del array actual de recipes por id, nunca guardar el objeto
+  // completo en estado: si recipes se refresca (nuevas referencias), un objeto
+  // guardado quedaría "stale" y categoryRecipes.indexOf(detail) fallaría (-1),
+  // causando que la imagen cambiara sola a un índice de fallback incorrecto.
+  const detail = detailId ? recipes.find((r) => r.id === detailId) ?? null : null
 
   if (detail) {
     const fit = computeMacroFit(detail, remaining)
@@ -181,7 +199,7 @@ export function RecomendadosView({ onBack }: Props) {
 
     return (
       <div className="flex flex-col gap-5 px-4 pb-4 pt-8">
-        <button type="button" onClick={() => setDetail(null)} className="self-start text-sm font-medium text-muted-foreground">
+        <button type="button" onClick={() => setDetailId(null)} className="self-start text-sm font-medium text-muted-foreground">
           ← Volver
         </button>
 
@@ -300,7 +318,7 @@ export function RecomendadosView({ onBack }: Props) {
             const fit = computeMacroFit(recipe, remaining)
             return (
               <li key={recipe.id}>
-                <button type="button" onClick={() => setDetail(recipe)} className="w-full text-left">
+                <button type="button" onClick={() => setDetailId(recipe.id)} className="w-full text-left">
                   <Card className="flex-row items-center gap-3 p-3">
                     <DishImage
                       src={getGenericImage(recipe, i)}
