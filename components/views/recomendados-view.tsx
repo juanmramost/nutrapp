@@ -25,6 +25,43 @@ const CATEGORIES: { id: CookingCategory; label: string }[] = [
   { id: "cena", label: "Cena" },
 ]
 
+const CACHE_KEY = "recomendados_cache"
+const CACHE_TTL_MS = 5 * 24 * 60 * 60 * 1000 // 5 días
+
+interface RecomendadosCache {
+  recipes: CookingRecipe[]
+  timestamp: number
+}
+
+function readCache(): RecomendadosCache | null {
+  try {
+    const raw = localStorage.getItem(CACHE_KEY)
+    if (!raw) return null
+    const parsed = JSON.parse(raw) as RecomendadosCache
+    if (!parsed || !Array.isArray(parsed.recipes) || typeof parsed.timestamp !== "number") return null
+    return parsed
+  } catch {
+    return null
+  }
+}
+
+function writeCache(recipes: CookingRecipe[]) {
+  try {
+    const payload: RecomendadosCache = { recipes, timestamp: Date.now() }
+    localStorage.setItem(CACHE_KEY, JSON.stringify(payload))
+  } catch {
+    // localStorage puede fallar (modo privado, cuota llena, etc.) — no es crítico
+  }
+}
+
+function clearCache() {
+  try {
+    localStorage.removeItem(CACHE_KEY)
+  } catch {
+    // no-op
+  }
+}
+
 async function authedFetch(path: string, method: "GET" | "POST") {
   const { data: sessionData } = await supabase.auth.getSession()
   const session = sessionData.session
@@ -54,35 +91,62 @@ export function RecomendadosView({ onBack }: Props) {
       if (!user) return
       setLoading(true)
       setError(null)
+
       try {
+        // 1. Intentar usar el cache si no ha expirado (< 5 días)
+        const cached = readCache()
+        if (cached && Date.now() - cached.timestamp < CACHE_TTL_MS) {
+          setRecipes(cached.recipes)
+          setLoading(false)
+          return
+        }
+
+        // 2. Sin cache válido: pedir al backend
         const res = await authedFetch("/api/cooking-recommendations", "GET")
         const data = await res.json()
         if (!res.ok) throw new Error(data?.error || "Error al cargar recomendaciones")
 
-        if (!data.recommendations || data.recommendations.expired || data.recommendations.recipes.length === 0) {
+        let recipesData: CookingRecipe[] = data.recommendations?.recipes ?? []
+
+        if (!data.recommendations || data.recommendations.expired || recipesData.length === 0) {
           const genRes = await authedFetch("/api/cooking-recommendations", "POST")
           const genData = await genRes.json()
           if (!genRes.ok) throw new Error(genData?.error || "Error al generar recomendaciones")
-          setRecipes(genData.recommendations.recipes)
-        } else {
-          setRecipes(data.recommendations.recipes)
+          recipesData = genData.recommendations.recipes
         }
+
+        writeCache(recipesData)
+        setRecipes(recipesData)
       } catch (e) {
         setError(e instanceof Error ? e.message : "Error al cargar recomendaciones")
       } finally {
         setLoading(false)
       }
     }
+
     load()
+
+    // Cerrar canales de Supabase Realtime al salir de la página / entrar en bfcache,
+    // para evitar los errores de WebSocket al volver atrás/adelante.
+    const handlePageHide = () => {
+      supabase.removeAllChannels().catch((e) => {
+        console.error("Error limpiando canales de Supabase:", e)
+      })
+    }
+
+    window.addEventListener("pagehide", handlePageHide)
+    return () => window.removeEventListener("pagehide", handlePageHide)
   }, [user])
 
   async function handleRegenerate() {
     setRegenerating(true)
     setError(null)
     try {
+      clearCache()
       const res = await authedFetch("/api/cooking-recommendations", "POST")
       const data = await res.json()
       if (!res.ok) throw new Error(data?.error || "Error al generar recomendaciones")
+      writeCache(data.recommendations.recipes)
       setRecipes(data.recommendations.recipes)
     } catch (e) {
       setError(e instanceof Error ? e.message : "Error al generar recomendaciones")
