@@ -24,6 +24,60 @@ function lastNDateKeys(n: number): string[] {
   return keys
 }
 
+// ============ RATE LIMITING ============
+const MAX_RECOMMENDATIONS_PER_MINUTE = 3
+const recommendationCounts = new Map<string, { count: number; resetAt: number }>()
+
+function takeRecommendationLimit(userId: string): boolean {
+  const now = Date.now()
+  const current = recommendationCounts.get(userId)
+  if (!current || current.resetAt <= now) {
+    recommendationCounts.set(userId, { count: 1, resetAt: now + 60_000 })
+    return true
+  }
+  if (current.count >= MAX_RECOMMENDATIONS_PER_MINUTE) return false
+  current.count += 1
+  return true
+}
+
+// ============ RETRY LOGIC ============
+const RETRY_DELAYS_MS = [300, 900]
+
+function wait(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms))
+}
+
+function isRetryable(error: unknown): boolean {
+  if (error instanceof TypeError) return true
+  if (error && typeof error === "object") {
+    const status = Number(
+      (error as { status?: number; statusCode?: number }).status ??
+        (error as { statusCode?: number }).statusCode
+    )
+    if ([408, 429, 500, 502, 503, 504].includes(status)) return true
+  }
+  return error instanceof Error && /Error de Gemini \((429|500|502|503|504)\)/.test(error.message)
+}
+
+async function retry<T>(fn: () => Promise<T>): Promise<T> {
+  let lastError: unknown
+  for (let attempt = 0; attempt <= RETRY_DELAYS_MS.length; attempt++) {
+    try {
+      return await fn()
+    } catch (err) {
+      lastError = err
+      if (!isRetryable(err) || attempt === RETRY_DELAYS_MS.length) break
+      console.warn("recommendations retry", {
+        attempt: attempt + 1,
+        message: err instanceof Error ? err.message : String(err),
+      })
+      await wait(RETRY_DELAYS_MS[attempt])
+    }
+  }
+  throw lastError
+}
+
+// ============ AUTH ============
 async function getAuthedUser(req: Request) {
   const authorization = req.headers.get("authorization")
   const token = authorization?.startsWith("Bearer ") ? authorization.slice(7) : null
@@ -31,7 +85,9 @@ async function getAuthedUser(req: Request) {
   const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
   if (!token || !supabaseUrl || !supabaseAnonKey) return null
 
-  const authClient = createClient(supabaseUrl, supabaseAnonKey, { auth: { persistSession: false } })
+  const authClient = createClient(supabaseUrl, supabaseAnonKey, {
+    auth: { persistSession: false },
+  })
   const { data, error: authError } = await authClient.auth.getUser(token)
   if (authError || !data.user) return null
   return data.user
@@ -118,6 +174,11 @@ export async function POST(req: Request) {
     const user = await getAuthedUser(req)
     if (!user) return error("Authentication required", 401)
 
+    // ✅ NUEVO: Rate limiting
+    if (!takeRecommendationLimit(user.id)) {
+      return error("Too many recommendation requests. Try again in a minute.", 429)
+    }
+
     const apiKey = process.env.GEMINI_API_KEY
     if (!apiKey) return error("Server API key not configured", 500)
 
@@ -135,12 +196,13 @@ export async function POST(req: Request) {
     if (existingError) throw existingError
     if (existing) return NextResponse.json({ recommendation: existing })
 
-    // 2. Leer perfil, logs y deficits del usuario (nunca de otro, filtrado por user.id)
-    const [{ data: profileRow }, { data: logsRow }, { data: deficitsRow }] = await Promise.all([
-      admin.from("profiles").select("data").eq("user_id", user.id).maybeSingle(),
-      admin.from("logs").select("data").eq("user_id", user.id).maybeSingle(),
-      admin.from("deficits").select("data").eq("user_id", user.id).maybeSingle(),
-    ])
+    // 2. Leer perfil, logs y deficits del usuario
+    const [{ data: profileRow }, { data: logsRow }, { data: deficitsRow }] =
+      await Promise.all([
+        admin.from("profiles").select("data").eq("user_id", user.id).maybeSingle(),
+        admin.from("logs").select("data").eq("user_id", user.id).maybeSingle(),
+        admin.from("deficits").select("data").eq("user_id", user.id).maybeSingle(),
+      ])
 
     const profile = (profileRow?.data ?? {}) as {
       objetivo?: string
@@ -154,7 +216,9 @@ export async function POST(req: Request) {
     const keys = lastNDateKeys(3)
     const labels = ["Día -2", "Día -1", "Hoy"]
 
-    const dayBlocks = keys.map((k, i) => summarizeDay(logs[k] ?? [], deficits[k], `${labels[i]} (${k})`))
+    const dayBlocks = keys.map((k, i) =>
+      summarizeDay(logs[k] ?? [], deficits[k], `${labels[i]} (${k})`)
+    )
 
     const objetivo = profile.objetivo ?? "mantener"
     let imc: number | null = null
@@ -183,7 +247,8 @@ ${dayBlocks.join("\n\n")}
 
 Analiza estos 3 días según las reglas indicadas y dame la recomendación de hoy.`
 
-    const result = await generateRecommendation(userPrompt, apiKey)
+    // ✅ NUEVO: Retry logic
+    const result = await retry(() => generateRecommendation(userPrompt, apiKey))
 
     const { data: saved, error: saveError } = await admin
       .from("recommendations")
@@ -196,7 +261,10 @@ Analiza estos 3 días según las reglas indicadas y dame la recomendación de ho
     return NextResponse.json({ recommendation: saved })
   } catch (caught) {
     console.error("recommendations POST failed", caught)
-    return error("No se pudo generar la recomendación. Inténtalo de nuevo en unos segundos.", 503)
+    return error(
+      "No se pudo generar la recomendación. Inténtalo de nuevo en unos segundos.",
+      503
+    )
   }
 }
 

@@ -50,6 +50,9 @@ export function TrackerProvider({ children }: { children: React.ReactNode }) {
   const [apiKey, setApiKeyState] = useState(() => loadApiKey())
   const todayKey = useMemo(() => dateKey(), [])
   const bcRef = useRef<BroadcastChannel | null>(null)
+  
+  // ✅ NUEVO: Debounce ref para localStorage
+  const storageTimeoutRef = useRef<NodeJS.Timeout>()
 
   useEffect(() => {
     if (typeof BroadcastChannel !== "undefined") {
@@ -80,14 +83,20 @@ export function TrackerProvider({ children }: { children: React.ReactNode }) {
         isApplyingRemoteRef.current = true
         if (remoteProfile) {
           setProfileState(remoteProfile)
-          try { saveProfile(remoteProfile) } catch {}
+          try {
+            saveProfile(remoteProfile)
+          } catch {}
         }
         if (remoteLogs) {
           setLogs(remoteLogs)
-          try { saveLogs(remoteLogs) } catch {}
+          try {
+            saveLogs(remoteLogs)
+          } catch {}
         }
         if (remoteDeficits) {
-          try { saveDeficits(remoteDeficits) } catch {}
+          try {
+            saveDeficits(remoteDeficits)
+          } catch {}
         }
         isApplyingRemoteRef.current = false
       } catch {
@@ -112,7 +121,9 @@ export function TrackerProvider({ children }: { children: React.ReactNode }) {
             const remote = await getProfile(user.id)
             if (remote) {
               setProfileState(remote)
-              try { saveProfile(remote) } catch {}
+              try {
+                saveProfile(remote)
+              } catch {}
             }
           } finally {
             isApplyingRemoteRef.current = false
@@ -132,7 +143,9 @@ export function TrackerProvider({ children }: { children: React.ReactNode }) {
             const remote = await getLogs(user.id)
             if (remote) {
               setLogs(remote)
-              try { saveLogs(remote) } catch {}
+              try {
+                saveLogs(remote)
+              } catch {}
             }
           } finally {
             isApplyingRemoteRef.current = false
@@ -151,7 +164,9 @@ export function TrackerProvider({ children }: { children: React.ReactNode }) {
             isApplyingRemoteRef.current = true
             const remote = await getDeficits(user.id)
             if (remote) {
-              try { saveDeficits(remote) } catch {}
+              try {
+                saveDeficits(remote)
+              } catch {}
             }
           } finally {
             isApplyingRemoteRef.current = false
@@ -161,32 +176,41 @@ export function TrackerProvider({ children }: { children: React.ReactNode }) {
       .subscribe()
 
     return () => {
-      try { profileChannel.unsubscribe() } catch {}
-      try { logsChannel.unsubscribe() } catch {}
-      try { deficitsChannel.unsubscribe() } catch {}
+      try {
+        profileChannel.unsubscribe()
+      } catch {}
+      try {
+        logsChannel.unsubscribe()
+      } catch {}
+      try {
+        deficitsChannel.unsubscribe()
+      } catch {}
     }
   }, [user])
 
-  const setProfile = useCallback((p: UserProfile) => {
-    setProfileState(p)
-    saveProfile(p)
-    // update today's deficit because basal may have changed
-    try {
-      const allLogs = loadLogs()
-      const dayEntries = allLogs[todayKey] ?? []
-      const basalNew = p.auto_basal ? calcBasal(p) : p.tdee_basal
-      const totals = computeTotals(dayEntries, basalNew)
-      setDeficit(todayKey, totals.deficitNeto)
-    } catch {
-      /* ignore errors */
-    }
-    // push to remote if logged in and not applying remote changes
-    try {
-      if (user && !isApplyingRemoteRef.current) {
-        void upsertProfile(user.id, p)
+  const setProfile = useCallback(
+    (p: UserProfile) => {
+      setProfileState(p)
+      saveProfile(p)
+      // update today's deficit because basal may have changed
+      try {
+        const allLogs = loadLogs()
+        const dayEntries = allLogs[todayKey] ?? []
+        const basalNew = p.auto_basal ? calcBasal(p) : p.tdee_basal
+        const totals = computeTotals(dayEntries, basalNew)
+        setDeficit(todayKey, totals.deficitNeto)
+      } catch {
+        /* ignore errors */
       }
-    } catch {}
-  }, [todayKey, user])
+      // push to remote if logged in and not applying remote changes
+      try {
+        if (user && !isApplyingRemoteRef.current) {
+          void upsertProfile(user.id, p)
+        }
+      } catch {}
+    },
+    [todayKey, user]
+  )
 
   const setApiKey = useCallback((k: string) => {
     setApiKeyState(k)
@@ -197,7 +221,7 @@ export function TrackerProvider({ children }: { children: React.ReactNode }) {
 
   const basal = useMemo(
     () => (profile.auto_basal ? calcBasal(profile) : profile.tdee_basal),
-    [profile],
+    [profile]
   )
 
   const totals = useMemo(() => computeTotals(todayEntries, basal), [todayEntries, basal])
@@ -224,6 +248,25 @@ export function TrackerProvider({ children }: { children: React.ReactNode }) {
     return unique
   }, [logs])
 
+  // ✅ NUEVO: Helper para emitir sync (con debounce en localStorage)
+  const emitSync = useCallback((key: string) => {
+    if (typeof window !== "undefined") {
+      try {
+        window.dispatchEvent(new CustomEvent("deficits:changed", { detail: { key } }))
+      } catch {}
+      try {
+        bcRef.current?.postMessage({ type: "sync", key })
+      } catch {}
+      // ✅ Debounce localStorage: máximo una vez cada 500ms
+      clearTimeout(storageTimeoutRef.current)
+      storageTimeoutRef.current = setTimeout(() => {
+        try {
+          localStorage.setItem("nutrapp:sync", String(Date.now()))
+        } catch {}
+      }, 500)
+    }
+  }, [])
+
   const removeDay = useCallback(
     (dk: string) => {
       // remove from storage
@@ -249,23 +292,10 @@ export function TrackerProvider({ children }: { children: React.ReactNode }) {
         }
       } catch {}
 
-      // emit sync events for other contexts
-      if (typeof window !== "undefined") {
-        try {
-          window.dispatchEvent(new CustomEvent("deficits:changed", { detail: { key: dk } }))
-        } catch {}
-        try {
-          window.dispatchEvent(new CustomEvent("logs:changed", { detail: { key: dk } }))
-        } catch {}
-        try {
-          bcRef.current?.postMessage({ type: "sync", key: dk })
-        } catch {}
-        try {
-          localStorage.setItem("nutrapp:sync", String(Date.now()))
-        } catch {}
-      }
+      // ✅ Usa helper con debounce
+      emitSync(dk)
     },
-    [user],
+    [user, emitSync]
   )
 
   const addToday = useCallback(
@@ -277,15 +307,8 @@ export function TrackerProvider({ children }: { children: React.ReactNode }) {
           const dayEntries = next[todayKey] ?? []
           const totals = computeTotals(dayEntries, basal)
           setDeficit(todayKey, totals.deficitNeto)
-          if (typeof window !== "undefined") {
-            window.dispatchEvent(new CustomEvent("deficits:changed", { detail: { key: todayKey } }))
-            try {
-              bcRef.current?.postMessage({ type: "sync", key: todayKey })
-            } catch {}
-            try {
-              localStorage.setItem("nutrapp:sync", String(Date.now()))
-            } catch {}
-          }
+          // ✅ Usa helper con debounce
+          emitSync(todayKey)
         } catch {
           /* ignore */
         }
@@ -299,7 +322,7 @@ export function TrackerProvider({ children }: { children: React.ReactNode }) {
         return next
       })
     },
-    [todayKey, basal, user],
+    [todayKey, basal, user, emitSync]
   )
 
   const removeToday = useCallback(
@@ -311,15 +334,8 @@ export function TrackerProvider({ children }: { children: React.ReactNode }) {
           const dayEntries = next[todayKey] ?? []
           const totals = computeTotals(dayEntries, basal)
           setDeficit(todayKey, totals.deficitNeto)
-          if (typeof window !== "undefined") {
-            window.dispatchEvent(new CustomEvent("deficits:changed", { detail: { key: todayKey } }))
-            try {
-              bcRef.current?.postMessage({ type: "sync", key: todayKey })
-            } catch {}
-            try {
-              localStorage.setItem("nutrapp:sync", String(Date.now()))
-            } catch {}
-          }
+          // ✅ Usa helper con debounce
+          emitSync(todayKey)
         } catch {
           /* ignore */
         }
@@ -332,7 +348,7 @@ export function TrackerProvider({ children }: { children: React.ReactNode }) {
         return next
       })
     },
-    [todayKey, basal, user],
+    [todayKey, basal, user, emitSync]
   )
 
   const updateToday = useCallback(
@@ -344,15 +360,8 @@ export function TrackerProvider({ children }: { children: React.ReactNode }) {
           const dayEntries = next[todayKey] ?? []
           const totals = computeTotals(dayEntries, basal)
           setDeficit(todayKey, totals.deficitNeto)
-          if (typeof window !== "undefined") {
-            window.dispatchEvent(new CustomEvent("deficits:changed", { detail: { key: todayKey } }))
-            try {
-              bcRef.current?.postMessage({ type: "sync", key: todayKey })
-            } catch {}
-            try {
-              localStorage.setItem("nutrapp:sync", String(Date.now()))
-            } catch {}
-          }
+          // ✅ Usa helper con debounce
+          emitSync(todayKey)
         } catch {
           /* ignore */
         }
@@ -365,7 +374,7 @@ export function TrackerProvider({ children }: { children: React.ReactNode }) {
         return next
       })
     },
-    [todayKey, basal, user],
+    [todayKey, basal, user, emitSync]
   )
 
   // Listen for external sync messages (BroadcastChannel or storage events)
@@ -408,7 +417,6 @@ export function TrackerProvider({ children }: { children: React.ReactNode }) {
       if (typeof window !== "undefined") window.removeEventListener("storage", storageHandler)
     }
   }, [])
-
 
   const value: TrackerContextValue = {
     ready,

@@ -71,6 +71,8 @@ export function ProfileView() {
   const { user, isGuest, signOut, clearGuest } = useAuth()
   const [draft, setDraft] = useState<UserProfile>(profile)
   const [savedProfile, setSavedProfile] = useState(false)
+  // ✅ NUEVO: State para bloquear doble-click
+  const [savingProfile, setSavingProfile] = useState(false)
 
   const basalCalculado = calcBasal(draft)
   const autoImc = calculateImc(draft.peso_kg, draft.altura_cm)
@@ -82,15 +84,23 @@ export function ProfileView() {
     setSavedProfile(false)
   }
 
-  function handleSaveProfile() {
-    const next: UserProfile = {
-      ...draft,
-      tdee_basal: draft.auto_basal ? basalCalculado : draft.tdee_basal,
+  // ✅ NUEVO: Async handler con protección
+  async function handleSaveProfile() {
+    if (savingProfile) return
+    setSavingProfile(true)
+    try {
+      const next: UserProfile = {
+        ...draft,
+        tdee_basal: draft.auto_basal ? basalCalculado : draft.tdee_basal,
+      }
+      setProfile(next)
+      setDraft(next)
+      setSavedProfile(true)
+      // Esperar a que invalide antes de desbloquearel botón
+      await invalidateTodayRecommendation()
+    } finally {
+      setSavingProfile(false)
     }
-    setProfile(next)
-    setDraft(next)
-    setSavedProfile(true)
-    void invalidateTodayRecommendation()
   }
 
   return (
@@ -218,9 +228,14 @@ export function ProfileView() {
         )}
       </Card>
 
-      <Button className="h-12 w-full gap-2" onClick={handleSaveProfile}>
-        {savedProfile ? <Check className="size-4" /> : null}
-        {savedProfile ? "Perfil guardado" : "Guardar perfil"}
+      {/* ✅ NUEVO: Botón con disabled y estados */}
+      <Button 
+        className="h-12 w-full gap-2" 
+        onClick={handleSaveProfile}
+        disabled={savingProfile}
+      >
+        {savedProfile && !savingProfile ? <Check className="size-4" /> : null}
+        {savingProfile ? "Guardando perfil..." : savedProfile ? "Perfil guardado" : "Guardar perfil"}
       </Button>
 
       <div className="mt-4">
@@ -229,12 +244,21 @@ export function ProfileView() {
             Cerrar sesión
           </Button>
         ) : isGuest ? (
-          <Button variant="outline" className="w-full" onClick={() => { clearGuest(); window.location.reload() }}>
+          <Button
+            variant="outline"
+            className="w-full"
+            onClick={() => {
+              clearGuest()
+              window.location.reload()
+            }}
+          >
             Salir de invitado
           </Button>
         ) : (
           <a href="/login">
-            <Button variant="outline" className="w-full">Iniciar sesión</Button>
+            <Button variant="outline" className="w-full">
+              Iniciar sesión
+            </Button>
           </a>
         )}
       </div>
