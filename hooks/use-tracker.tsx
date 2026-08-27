@@ -52,7 +52,7 @@ export function TrackerProvider({ children }: { children: React.ReactNode }) {
   const bcRef = useRef<BroadcastChannel | null>(null)
   
   // ✅ NUEVO: Debounce ref para localStorage
-  const storageTimeoutRef = useRef<NodeJS.Timeout>()
+  const storageTimeoutRef = useRef<NodeJS.Timeout | undefined>(undefined)
 
   useEffect(() => {
     if (typeof BroadcastChannel !== "undefined") {
